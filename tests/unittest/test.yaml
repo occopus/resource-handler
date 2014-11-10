@@ -1,0 +1,48 @@
+default_mqconfig: &MQCFG
+    protocol: amqp
+    host: c153-33.localcloud
+    vhost: test
+    exhange: ''
+    routing_key: ''
+    user: test
+    password: test
+    queue: test
+ip_mqconfig: &IP_MQCFG
+    <<: *MQCFG
+    queue: remote_infobroker_test
+    routing_key: remote_infobroker_test
+ctl_mqconfig: &CTL_MQCFG
+    <<: *MQCFG
+    queue: remote_infobroker_test_ctl
+    routing_key: remote_infobroker_test_ctl
+logging:
+    version: 1
+    root:
+        level: DEBUG
+        handlers: [console, file]
+    formatters:
+        simpleFormater:
+            format: "%(asctime)s\t%(levelname)s\t%(threadName)s\t%(message)s"
+#            datefmt: '%Y-%m-%d %H:%M:%S.%f'
+
+    handlers:
+        console:
+            class: logging.StreamHandler
+            formatter: simpleFormater
+            level: DEBUG
+            stream: ext://sys.stdout
+        file:
+            class : logging.FileHandler
+            formatter: simpleFormater
+            level: DEBUG
+            filename: rabbit.log
+
+    loggers:
+        pika:
+            propagate: false
+            level: ERROR
+            handlers: [console]
+        occo:
+            propagate: false
+            level: DEBUG
+            handlers: [console, file]
