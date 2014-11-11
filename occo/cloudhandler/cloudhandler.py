@@ -14,12 +14,14 @@ class CloudHandler(factory.MultiBackend):
     One-shot objects performing a single operation. No run-time state
     is retained.
     """
-    def __init__(self, **config):
-        pass
+    def __init__(self, target, auth_data, **config):
+        self.target = target
+        self.auth_data = auth_data
 
-    def start_vm(self, target, auth_data, vm_description):
+    def create_node(self, vm_description):
         raise NotImplementedError()
-    def stop_vm(self, target, auth_data, vm_id):
+    def drop_node(self, vm_id):
         raise NotImplementedError()
-
+    def get_node_state(self, vm_id):
+        raise NotImplementedError()
 
