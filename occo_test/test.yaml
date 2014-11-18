@@ -15,6 +15,18 @@ ctl_mqconfig: &CTL_MQCFG
     <<: *MQCFG
     queue: remote_infobroker_test_ctl
     routing_key: remote_infobroker_test_ctl
+clouds:
+    dummy_cloud_instance0: !CloudHandler
+        protocol: dummy
+        target:
+            url: https://example.org/
+        auth_data:
+            backend_specific_auth_data: almafa
+        kvstore: !KeyValueStore
+            protocol: dict
+            init_dict:
+                test: 1
+                testt: 2
 logging:
     version: 1
     root:
