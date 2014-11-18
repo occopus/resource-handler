@@ -27,6 +27,13 @@ clouds:
             init_dict:
                 test: 1
                 testt: 2
+    boto_lpds_cloud_instance:
+        protocol: boto
+        name: LPDS-Cloud
+        target:
+            endpoint: http://cfe2.lpds.sztaki.hu:4567
+            regionname: ROOT
+        auth_data: OMITTED_FOR_SECURITY
 logging:
     version: 1
     root:
