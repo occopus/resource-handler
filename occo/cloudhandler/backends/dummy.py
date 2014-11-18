@@ -24,6 +24,7 @@ class DummyCloudHandler(CloudHandler):
     def __init__(self, kvstore, **config):
         self.kvstore = kvstore
         self.delayed = config.get('delayed', False)
+
     def create_node(self, node_description):
         log.debug("[CH] Creating node: %r", node_description)
         if self.delayed:
@@ -34,11 +35,12 @@ class DummyCloudHandler(CloudHandler):
         self.kvstore[uid]['running'] = True
         log.debug("[CH] Done")
         return uid
+
     def drop_node(self, node_id):
         log.debug("[CH] Dropping node '%s'", node_id)
         if self.delayed:
             time.sleep(2 + max(-2, random.normalvariate(0, 0.5)))
-        self.kvstore[node_id] = False
+        self.kvstore[node_id]['running'] = False
         log.debug("[CH] Done")
 
     def get_node_state(self, node_id):
