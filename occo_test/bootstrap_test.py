@@ -1,6 +1,9 @@
 #!/dev/null
 
-from common import *
+from nose.tools import eq_, ok_
+import common
 
 def test():
-    configure()
+    cfg = common.configure()
+    ok_(hasattr(cfg, 'clouds'))
+    ok_('dummy_cloud_instance0' in cfg.clouds)
