@@ -23,16 +23,21 @@ log = logging.getLogger('occo.cloudhandler.backends.dummy')
 class DummyCloudHandler(CloudHandler):
     def __init__(self, kvstore, **config):
         self.kvstore = kvstore
+        self.delayed = config.get('delayed', False)
     def create_node(self, node_description):
-        log.debug("[CH] Creating node: %r", node)
-        time.sleep(3 + max(-2, random.normalvariate(0, 0.5)))
+        log.debug("[CH] Creating node: %r", node_description)
+        if self.delayed:
+            time.sleep(3 + max(-2, random.normalvariate(0, 0.5)))
         uid = 'dummy_vm_{0}'.format(uuid.uuid4())
-        self.kvstore[uid] = True
+        node_description['instance_id'] = uid
+        self.kvstore[uid] = node_description
+        self.kvstore[uid]['running'] = True
         log.debug("[CH] Done")
         return uid
     def drop_node(self, node_id):
         log.debug("[CH] Dropping node '%s'", node_id)
-        time.sleep(2 + max(-2, random.normalvariate(0, 0.5)))
+        if self.delayed:
+            time.sleep(2 + max(-2, random.normalvariate(0, 0.5)))
         self.kvstore[node_id] = False
         log.debug("[CH] Done")
 
