@@ -32,7 +32,7 @@ clouds:
             init_dict:
                 test: 1
                 testt: 2
-    boto_lpds_cloud_instance:
+    boto_lpds_cloud_instance: !CloudHandler
         protocol: boto
         name: LPDS-Cloud
         dry_run: true
