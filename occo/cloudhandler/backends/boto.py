@@ -71,7 +71,7 @@ class BotoCloudHandler(CloudHandler):
             vm_id = self._start_instance(image_id, instance_type, context)
             self.drett_resource_id = a.set_resource_data(vm_id)
 
-        log.debug("[%s] Done; vm_id = %r", self.name, m_id)
+        log.debug("[%s] Done; vm_id = %r", self.name, vm_id)
         return vm_id
 
     def drop_node(self, node_id):
