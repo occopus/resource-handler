@@ -38,12 +38,19 @@ class BotoTest(unittest.TestCase):
             log.debug(self.ch.get_node_state(nid))
         finally:
             self.ch.drop_node(nid)
+
+    def update_drop_nodes(self):
+        with open(DROP_NODES_FILE, 'w') as f:
+            f.write(yaml.dump(self.drop_nodes))
+            log.debug("Allocated nodes: %r", self.drop_nodes)
     
     def test_create_node(self):
         self.cfg['dry_run'] = False
         self.ch = CloudHandler(**self.cfg)
         nid = self.ch.create_node(self.node_def)
         log.debug("Resource acquired; node_id = '%s'", nid)
+        self.drop_nodes.append(nid)
+        self.update_drop_nodes()
 
     def test_drop_node(self):
         self.cfg['dry_run'] = False
@@ -59,7 +66,7 @@ class BotoTest(unittest.TestCase):
                 remaining.append(i)
             else:
                 log.debug('Successfully dropped node.')
-        with open(DROP_NODES_FILE, 'w') as f:
-            f.write(yaml.dump(remaining))
+        self.drop_nodes = remaining
+        self.update_drop_nodes()
         if last_exception:
             raise last_exception
