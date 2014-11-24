@@ -70,3 +70,18 @@ class BotoTest(unittest.TestCase):
         self.update_drop_nodes()
         if last_exception:
             raise last_exception
+
+    def test_node_status(self):
+        self.cfg['dry_run'] = False
+        self.ch = CloudHandler(**self.cfg)
+        last_exception = None
+        for i in self.drop_nodes:
+            try:
+                node_state = self.ch.get_node_state(i)
+                log.info("Status of node '%s' is '%s'", i, node_state)
+            except Exception as ex:
+                log.exception('Failure:')
+                last_exception = ex
+                remaining.append(i)
+        if last_exception:
+            raise last_exception
