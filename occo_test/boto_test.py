@@ -6,6 +6,9 @@ import common
 import occo.cloudhandler.backends.boto
 from occo.cloudhandler import CloudHandler
 import yaml
+import logging
+
+log = logging.getLogger('occo_test.boto_test')
 
 class BotoTest(unittest.TestCase):
     def setUp(self):
@@ -19,7 +22,7 @@ class BotoTest(unittest.TestCase):
         self.ch = CloudHandler(**self.cfg)
         nid = self.ch.create_node(self.node_def)
         try:
-            print self.ch.get_node_state(nid)
+            log.debug(self.ch.get_node_state(nid))
         finally:
             self.ch.drop_node(nid)
     

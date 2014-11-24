@@ -82,3 +82,7 @@ logging:
             propagate: false
             level: DEBUG
             handlers: [console, file]
+        occo_test:
+            propagate: false
+            level: DEBUG
+            handlers: [console, file]
