@@ -28,13 +28,13 @@ class BotoCloudHandler(CloudHandler):
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
-        endpoint = target['endpoint']
         self.name = name if name else endpoint
         self.drett_config = drett_config
         self.setup_connection(target, auth_data)
 
     @wet_method()
     def setup_connection(self, target, auth_data):
+        endpoint = target['endpoint']
         url = urlparse.urlparse(endpoint)
         region = boto.ec2.regioninfo.RegionInfo(
             name=target['regionname'], endpoint=url.hostname)
