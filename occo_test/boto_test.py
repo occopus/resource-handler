@@ -57,7 +57,9 @@ class BotoTest(unittest.TestCase):
                 log.exception('Failure:')
                 last_exception = ex
                 remaining.append(i)
+            else:
+                log.debug('Successfully dropped node.')
+        with open(DROP_NODES_FILE, 'w') as f:
+            f.write(yaml.dump(remaining))
         if last_exception:
-            with open(DROP_NODES_FILE, 'w') as f:
-                f.write(yaml.dump(remaining))
-                raise last_exception
+            raise last_exception
