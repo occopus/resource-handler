@@ -48,8 +48,9 @@ class BotoCloudHandler(CloudHandler):
 
     @wet_method(1)
     def _start_instance(self, image_id, instance_type, context):
-        return self.conn.run_instances(image_id=image_id,
-                                       instance_type=instance_type)
+        reservation = self.conn.run_instances(image_id=image_id,
+                                              instance_type=instance_type)
+        return reservation.instances[0].id
 
     @wet_method()
     def _delete_vms(self, *vm_ids):
