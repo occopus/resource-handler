@@ -62,7 +62,8 @@ class BotoCloudHandler(CloudHandler):
     @wet_method('occo-dummy-state')
     def _get_status(self, vm_id):
         reservations = self.conn.get_all_reservations(instance_ids=[vm_id])
-        instance = reservations[0]
+        # TODO: ASSUMING len(reservations)==1 and len(instances)==1
+        instance = reservations[0].instances[0]
         return instance.state
 
     def create_node(self, node_description):
