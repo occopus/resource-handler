@@ -56,9 +56,11 @@ class BotoCloudHandler(CloudHandler):
     def _delete_vms(self, *vm_ids):
         self.conn.terminate_instances(instance_ids=vm_ids)
 
-    @wet_method()
+    @wet_method('occo-dummy-state')
     def _get_status(self, vm_id):
-        return ''
+        reservations = self.conn.get_all_reservations(instance_ids=[vm_id])
+        instance = reservations[0]
+        return instance.state
 
     def create_node(self, node_description):
         log.debug("[%s] Creating node: %r", self.name, node_description)
