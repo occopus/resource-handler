@@ -27,3 +27,8 @@ class BotoTest(unittest.TestCase):
         finally:
             self.ch.drop_node(nid)
     
+    def test_create_node(self):
+        self.cfg['dry_run'] = False
+        self.ch = CloudHandler(**self.cfg)
+        nid = self.ch.create_node(self.node_def)
+        log.debug("Resource acquired; node_id = '%s'", nid)
