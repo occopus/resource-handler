@@ -48,7 +48,7 @@ clouds:
             <<: *DRETT_CONFIG
 node_defs:
     node1:
-        image_id: ami-00000000
+        image_id: ami-00001082 # Ubuntu 14.04 cloud-init
         instance_type: m1.small
         context: ''
 logging:
