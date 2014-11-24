@@ -15,7 +15,8 @@ class BotoTest(unittest.TestCase):
         cfg = common.configure()
         self.cfg = cfg.clouds['boto_lpds_cloud_instance']
         with open('occo_test/auth_data.yaml') as f:
-            self.cfg['auth_data'] = yaml.load(f)
+            self.cfg['auth_data'] = yaml.load(f)['boto_lpds']
+        log.debug('Using Boto config:\n%s', yaml.dump(self.cfg))
         self.node_def = cfg.node_defs['node1']
     def test_full_dryrun(self):
         self.cfg['dry_run'] = True
