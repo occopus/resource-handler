@@ -11,7 +11,8 @@ class BotoTest(unittest.TestCase):
         cfg = common.configure()
         self.cfg = cfg.clouds['boto_lpds_cloud_instance']
         self.node_def = cfg.node_defs['node1']
-    def test_node(self):
+    def test_full_dryrun(self):
+        self.cfg['dry_run'] = True
         self.ch = CloudHandler(**self.cfg)
         nid = self.ch.create_node(self.node_def)
         try:

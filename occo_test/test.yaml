@@ -35,7 +35,7 @@ clouds:
     boto_lpds_cloud_instance:
         protocol: boto
         name: LPDS-Cloud
-        dry_run: true
+        dry_run: false
         target:
             endpoint: http://cfe2.lpds.sztaki.hu:4567
             regionname: ROOT
