@@ -31,6 +31,9 @@ class BotoCloudHandler(CloudHandler):
         self.name = name if name else endpoint
         self.drett_config = drett_config
         self.setup_connection(target, auth_data)
+        # The following is intentional. It is a constant yet,
+        # but maybe it'll change in the future.
+        self.resource_type = 'vm'
 
     @wet_method()
     def setup_connection(self, target, auth_data):
@@ -69,10 +72,10 @@ class BotoCloudHandler(CloudHandler):
         context = node_description['context']
 
         with drett.Allocation(resource_owner=self.name,
-                              resource_type='vm',
+                              resource_type=self.resource_type,
                               **self.drett_config) as a:
             vm_id = self._start_instance(image_id, instance_type, context)
-            self.drett_resource_id = a.set_resource_data(vm_id)
+            a.set_resource_data(vm_id)
 
         log.debug("[%s] Done; vm_id = %r", self.name, vm_id)
         return vm_id
@@ -84,7 +87,9 @@ class BotoCloudHandler(CloudHandler):
 
         drett \
             .ResourceTracker(url=self.drett_config['url']) \
-            .resource_freed(self.drett_resource_id)
+            .resource_freed_by_attributes(resource_owner=self.name,
+                                          resource_type=self.resource_type,
+                                          resource_id=node_id)
 
         log.debug("[%s] Done", self.name)
 
