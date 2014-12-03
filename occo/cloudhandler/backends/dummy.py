@@ -30,8 +30,13 @@ class DummyCloudHandler(CloudHandler):
         if self.delayed:
             time.sleep(3 + max(-2, random.normalvariate(0, 0.5)))
         uid = 'dummy_vm_{0}'.format(uuid.uuid4())
-        node_description['instance_id'] = uid
-        self.kvstore[uid] = node_description
+        node_instance = dict(
+            instance_id=uid,
+            environment_id=node_description['environment_id'],
+            node_id=node_description['id'],
+            node_type=node_description['name'],
+            running=False)
+        self.kvstore[uid] = node_instance
         self.kvstore[uid]['running'] = True
         log.debug("[CH] Done")
         return uid
