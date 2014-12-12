@@ -1,3 +1,8 @@
+drett_config: &DRETT_CONFIG
+    url: http://c153-40.localcloud:5002/drett
+    application: occo-test
+    module: boto-handler
+    timeout: 600
 default_mqconfig: &MQCFG
     protocol: amqp
     host: c153-33.localcloud
@@ -27,6 +32,25 @@ clouds:
             init_dict:
                 test: 1
                 testt: 2
+    boto_lpds_cloud_instance:
+        protocol: boto
+        name: LPDS-Cloud
+        dry_run: false
+        target:
+            endpoint: http://cfe2.lpds.sztaki.hu:4567
+            regionname: ROOT
+        auth_data:
+            OMITTED_FOR_SECURITY; IDEAS:
+            - uds://<user_auth_data> (acq.d by infraprocessor)
+            - file://<path to yaml containing only auth_data> (acq.d by CH)
+            - mapping written directly here (if security is not a concern)
+        drett_config:
+            <<: *DRETT_CONFIG
+node_defs:
+    node1:
+        image_id: ami-00001082 # Ubuntu 14.04 cloud-init
+        instance_type: m1.small
+        context: ''
 logging:
     version: 1
     root:
@@ -55,6 +79,10 @@ logging:
             level: ERROR
             handlers: [console]
         occo:
+            propagate: false
+            level: DEBUG
+            handlers: [console, file]
+        occo_test:
             propagate: false
             level: DEBUG
             handlers: [console, file]
