@@ -22,4 +22,3 @@ class CloudHandler(factory.MultiBackend):
         raise NotImplementedError()
     def get_node_state(self, vm_id):
         raise NotImplementedError()
-

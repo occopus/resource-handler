@@ -38,7 +38,7 @@ class DummyCloudHandler(CloudHandler):
             running=False)
         self.kvstore[uid] = node_instance
         self.kvstore[uid]['running'] = True
-        log.debug("[CH] Done")
+        log.debug("[CH] Done; Created node '%s'", uid)
         return uid
 
     def drop_node(self, node_id):
@@ -49,4 +49,9 @@ class DummyCloudHandler(CloudHandler):
         log.debug("[CH] Done")
 
     def get_node_state(self, node_id):
-        return self.kvstore[node_id]
+        log.debug("[CH] Acquiring node state for '%s'", node_id)
+        n = self.kvstore[node_id]
+        return \
+            'unknown' if not n \
+            else 'running' if n['running'] \
+            else 'pending'
