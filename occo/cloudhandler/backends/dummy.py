@@ -37,9 +37,14 @@ class DummyCloudHandler(CloudHandler):
             node_type=node_description['name'],
             running=False)
         self.kvstore[uid] = node_instance
-        self.kvstore[uid]['running'] = True
+        self.start_node(uid)
         log.debug("[CH] Done; Created node '%s'", uid)
         return uid
+    def start_node(self, node_id):
+        # kvstore[uid][running]=x doesn't work, __getitem__ returns a copy
+        node_data = self.kvstore[node_id]
+        node_data['running'] = True
+        self.kvstore[node_id] = node_data
 
     def drop_node(self, instance_data):
         node_id = instance_data['instance_id']
