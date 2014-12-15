@@ -16,9 +16,9 @@ class CloudHandler(factory.MultiBackend):
     """
     def __init__(self, **config):
         self.__dict__.update(config)
-    def create_node(self, vm_description):
+    def create_node(self, node_description):
         raise NotImplementedError()
-    def drop_node(self, vm_id):
+    def drop_node(self, instance_data):
         raise NotImplementedError()
-    def get_node_state(self, vm_id):
+    def get_node_state(self, instance_data):
         raise NotImplementedError()

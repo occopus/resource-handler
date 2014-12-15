@@ -81,7 +81,8 @@ class BotoCloudHandler(CloudHandler):
         log.debug("[%s] Done; vm_id = %r", self.name, vm_id)
         return vm_id
 
-    def drop_node(self, node_id):
+    def drop_node(self, instance_data):
+        node_id = instance_data['node_id']
         log.debug("[%s] Dropping node '%s'", self.name, node_id)
 
         self._delete_vms(node_id)
@@ -94,7 +95,8 @@ class BotoCloudHandler(CloudHandler):
 
         log.debug("[%s] Done", self.name)
 
-    def get_node_state(self, node_id):
+    def get_node_state(self, instance_data):
+        node_id = instance_data['node_id']
         log.debug("[%s] Acquiring node state for '%s'", self.name, node_id)
         retval = self._get_status(node_id)
         log.debug("[%s] Done; retval='%s'", self.name, retval)

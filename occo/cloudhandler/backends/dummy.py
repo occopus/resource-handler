@@ -41,14 +41,16 @@ class DummyCloudHandler(CloudHandler):
         log.debug("[CH] Done; Created node '%s'", uid)
         return uid
 
-    def drop_node(self, node_id):
+    def drop_node(self, instance_data):
+        node_id = instance_data['instance_id']
         log.debug("[CH] Dropping node '%s'", node_id)
         if self.delayed:
             time.sleep(2 + max(-2, random.normalvariate(0, 0.5)))
         self.kvstore[node_id]['running'] = False
         log.debug("[CH] Done")
 
-    def get_node_state(self, node_id):
+    def get_node_state(self, instance_data):
+        node_id = instance_data['instance_id']
         log.debug("[CH] Acquiring node state for '%s'", node_id)
         n = self.kvstore[node_id]
         return \
