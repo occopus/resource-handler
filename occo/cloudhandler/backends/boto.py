@@ -28,7 +28,7 @@ class BotoCloudHandler(CloudHandler):
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
-        self.name = name if name else endpoint
+        self.name = name if name else target['endpoint']
         self.drett_config = drett_config
         self.setup_connection(target, auth_data)
         # The following is intentional. It is a constant yet,
