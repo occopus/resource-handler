@@ -67,7 +67,8 @@ class BotoCloudHandler(CloudHandler):
         return instance.state
 
     def create_node(self, node_description):
-        log.debug("[%s] Creating node: %r", self.name, node_description)
+        log.debug("[%s] Creating node: %r",
+                  self.name, node_description['name'])
         image_id = node_description['image_id']
         instance_type = node_description['instance_type']
         context = node_description['context']
