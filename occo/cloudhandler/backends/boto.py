@@ -83,22 +83,22 @@ class BotoCloudHandler(CloudHandler):
         return vm_id
 
     def drop_node(self, instance_data):
-        node_id = instance_data['node_id']
-        log.debug("[%s] Dropping node '%s'", self.name, node_id)
+        instance_id = instance_data['instance_id']
+        log.debug("[%s] Dropping node '%s'", self.name, instance_data['node_id'])
 
-        self._delete_vms(node_id)
+        self._delete_vms(instance_id)
 
         drett \
             .ResourceTracker(url=self.drett_config['url']) \
             .resource_freed_by_attributes(resource_owner=self.name,
                                           resource_type=self.resource_type,
-                                          resource_id=node_id)
+                                          resource_id=instance_id)
 
         log.debug("[%s] Done", self.name)
 
     def get_node_state(self, instance_data):
-        node_id = instance_data['node_id']
-        log.debug("[%s] Acquiring node state for '%s'", self.name, node_id)
-        retval = self._get_status(node_id)
+        log.debug("[%s] Acquiring node state for '%s'",
+                  self.name, instance_data['node_id'])
+        retval = self._get_status(instance_data['instance_id'])
         log.debug("[%s] Done; retval='%s'", self.name, retval)
         return retval
