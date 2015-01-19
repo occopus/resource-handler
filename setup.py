@@ -11,6 +11,8 @@ setuptools.setup(
     author='Adam Visegradi',
     author_email='adam.visegradi@sztaki.mta.hu',
     namespace_packages=['occo', 'occo.cloudhandler.backends'],
+    py_modules=['occo.cloudhandler.backends.dummy',
+                'occo.cloudhandler.backends.boto'],
     packages=['occo.cloudhandler'],
     scripts=[],
     url='http://www.lpds.sztaki.hu/',
