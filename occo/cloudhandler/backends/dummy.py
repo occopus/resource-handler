@@ -1,8 +1,15 @@
 #
 # Copyright (C) 2014 MTA SZTAKI
 #
-# Unit tests for the SZTAKI Cloud Orchestrator
-#
+
+""" Dummy implementation of the
+:class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
+
+This class is used for testing the services depending on the Cloud Handler
+(e.g.: the :ref:`Infrastructure Processor <IP>`.
+
+.. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>
+"""
 
 import occo.util as util
 import occo.util.config as config

@@ -1,5 +1,12 @@
+#
 # Copyright (C) MTA SZTAKI 2014
-# All rights reserved.
+#
+
+""" Abstract Cloud Handler module for OCCO
+
+.. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>
+
+"""
 
 __all__ = ['CloudHandler']
 

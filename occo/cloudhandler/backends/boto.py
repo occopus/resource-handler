@@ -2,7 +2,14 @@
 # Copyright (C) 2014 MTA SZTAKI
 #
 
-# To avoid self-importing this boto.py module
+""" Boto EC2 implementation of the
+:class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
+
+.. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>
+"""
+
+# To avoid self-importing *this* boto.py module (we need the "real" one
+# provided by the boto package.
 from __future__ import absolute_import
 import boto
 import boto.ec2
