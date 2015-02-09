@@ -1,8 +1,12 @@
 #
 # Copyright (C) 2014 MTA SZTAKI
 #
-# Unit tests for the SZTAKI Cloud Orchestrator
-#
+
+""" Dummy implementation of the
+:class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
+
+.. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>
+"""
 
 import occo.util as util
 import occo.util.config as config
@@ -21,27 +25,43 @@ log = logging.getLogger('occo.cloudhandler.backends.dummy')
 
 @factory.register(CloudHandler, PROTOCOL_ID)
 class DummyCloudHandler(CloudHandler):
+    """ Dummy implementation of the
+    :class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
+
+    This class is used for testing the services depending on the Cloud Handler
+    (e.g.: the :ref:`Infrastructure Processor <IP>`.
+
+    :param kvstore: The key-value store to be used as the backend.
+    :type kvstore: :class:`occo.infobroker.kvstore.KeyValueStore`
+    :param bool delayed: Do randomized mock delays in the dummy methods.
+        Default: :data:`False`.
+
+    """
     def __init__(self, kvstore, **config):
         self.kvstore = kvstore
         self.delayed = config.get('delayed', False)
 
     def create_node(self, node_description):
         log.debug("[CH] Creating node: %r", node_description)
+
         if self.delayed:
             time.sleep(3 + max(-2, random.normalvariate(0, 0.5)))
+
         uid = 'dummy_vm_{0}'.format(uuid.uuid4())
+
         node_instance = dict(
             instance_id=uid,
             environment_id=node_description['environment_id'],
             node_id=node_description['id'],
             node_type=node_description['name'],
             running=False)
+
         self.kvstore[uid] = node_instance
         self.start_node(uid)
         log.debug("[CH] Done; Created node '%s'", uid)
         return uid
+
     def start_node(self, node_id):
-        # kvstore[uid][running]=x doesn't work, __getitem__ returns a copy
         node_data = self.kvstore[node_id]
         node_data['running'] = True
         self.kvstore[node_id] = node_data
