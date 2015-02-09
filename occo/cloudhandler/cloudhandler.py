@@ -28,10 +28,11 @@ class CloudHandler(factory.MultiBackend):
 
         - A stub-skeleton pair
         - Probably the implementation of the Command strategy. But we need to
-        think this through first. (Many methods in the ``CloudHandler``
-        iterface are better supported with the Command strategy: it's much more
-        efficient. If we are reasonably sure that we'll only have these three
-        methods, we can simply proxy each of them individually.)
+          think this through first. (Many methods in the ``CloudHandler``
+          iterface are better supported with the Command strategy: it's much
+          more efficient. If we are reasonably sure that we'll only have these
+          three methods, we can simply proxy each of them individually.)
+
     """
     def __init__(self, **config):
         self.__dict__.update(config)
