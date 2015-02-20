@@ -39,5 +39,5 @@ class DummyTest(unittest.TestCase):
 	instance_data['instance_id'] = nid
         self.ch.drop_node(instance_data)
         s = self.ch.get_node_state(instance_data)
-        eq_(s['running'], False)
+        eq_(s, 'unknown')
     
