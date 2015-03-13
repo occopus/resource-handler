@@ -35,7 +35,7 @@ clouds:
     boto_lpds_cloud_instance:
         protocol: boto
         name: LPDS-Cloud
-        dry_run: false
+        dry_run: true
         target:
             endpoint: http://cfe2.lpds.sztaki.hu:4567
             regionname: ROOT
@@ -51,6 +51,7 @@ node_defs:
         image_id: ami-00001082 # Ubuntu 14.04 cloud-init
         instance_type: m1.small
         context: ''
+        name: node1
 logging:
     version: 1
     root:

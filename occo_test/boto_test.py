@@ -47,9 +47,10 @@ class BotoTest(unittest.TestCase):
     def test_create_node(self):
         self.cfg['dry_run'] = False
         self.ch = CloudHandler(**self.cfg)
+	log.debug("node_desc: %r", self.node_def)
         nid = self.ch.create_node(self.node_def)
         log.debug("Resource acquired; node_id = '%s'", nid)
-        self.drop_nodes.append(nid)
+        self.drop_nodes.append(dict(instance_id=nid, node_id="test"))
         self.update_drop_nodes()
 
     def test_drop_node(self):
@@ -82,6 +83,5 @@ class BotoTest(unittest.TestCase):
             except Exception as ex:
                 log.exception('Failure:')
                 last_exception = ex
-                remaining.append(i)
         if last_exception:
             raise last_exception
