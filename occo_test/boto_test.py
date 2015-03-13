@@ -35,9 +35,9 @@ class BotoTest(unittest.TestCase):
         self.ch = CloudHandler(**self.cfg)
         nid = self.ch.create_node(self.node_def)
         try:
-            log.debug(self.ch.get_node_state(nid))
+            log.debug(self.ch.get_node_state(dict(instance_id=nid, node_id="test")))
         finally:
-            self.ch.drop_node(nid)
+            self.ch.drop_node(dict(instance_id=nid, node_id="test"))
 
     def update_drop_nodes(self):
         with open(DROP_NODES_FILE, 'w') as f:
