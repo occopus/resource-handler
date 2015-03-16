@@ -1,7 +1,7 @@
-argparse>=1.2.1
-PyYAML>=3.10
-python-dateutil>=2.2
-boto>=2.34.0
-OCCO-Util>=0.1.0
-OCCO-InfoBroker>=0.1.0
-drett-client>=0.1.0
+argparse==1.2.1
+PyYAML==3.11
+python-dateutil==2.2
+boto==2.34.0
+OCCO-Util==0.1.0
+OCCO-InfoBroker==0.1.0
+drett-client==0.1.0

@@ -10,8 +10,9 @@ python-dateutil==2.2
 pytz==2014.9
 six==1.8.0
 wsgiref==0.1.2
-nose==1.3.4
 drett-client>=0.1.0
 pymongo==2.7.2
+nose==1.3.4
 -e ../util
 -e ../info-broker
+-e .

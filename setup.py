@@ -3,8 +3,6 @@
 import setuptools
 from pip.req import parse_requirements
 
-reqs = [ str(i.req) for i in parse_requirements('requirements.txt') ]
-
 setuptools.setup(
     name='OCCO-CloudHandler',
     version='0.1.0',
@@ -19,5 +17,11 @@ setuptools.setup(
     license='LICENSE.txt',
     description='OCCO Cloud Handler',
     long_description=open('README.txt').read(),
-    install_requires=reqs,
+    install_requires=['argparse',
+                      'PyYAML',
+                      'python-dateutil',
+                      'boto',
+                      'OCCO-Util',
+                      'OCCO-InfoBroker',
+                      'drett-client'],
 )
