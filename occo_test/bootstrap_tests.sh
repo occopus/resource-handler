@@ -13,6 +13,7 @@ FLAT=yes
 # If 'yes', the script will verify and enforce the existence auth_data.yaml. If
 # the work tree contains the auth_data file, it is installed automatically.
 WITH_AUTH_DATA=yes
+AUTH_DATA_FILE="${1:-auth_data.yaml}"
 
 ################################################################################
 
@@ -43,7 +44,7 @@ done
 
 if [ $WITH_AUTH_DATA == yes ]; then
     # It only exists in development work trees, not test deploys -- hopefully!
-    [ -f 'auth_data.yaml' ] && install 'auth_data.yaml'
+    [ -f "$AUTH_DATA_FILE" ] && install "$AUTH_DATA_FILE" "$CFG_DIR/auth_data.yaml"
 
     # Final check if auth_data exists.
     if [ ! -s "$CFG_DIR/auth_data.yaml" ]; then
