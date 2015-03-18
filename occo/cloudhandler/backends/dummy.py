@@ -71,7 +71,7 @@ class DummyCloudHandler(CloudHandler):
         log.debug("[CH] Dropping node '%s'", node_id)
         if self.delayed:
             time.sleep(2 + max(-2, random.normalvariate(0, 0.5)))
-        self.kvstore[node_id]['running'] = False
+        self.kvstore[node_id] = None
         log.debug("[CH] Done")
 
     def get_node_state(self, instance_data):
