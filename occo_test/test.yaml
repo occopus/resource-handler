@@ -39,11 +39,8 @@ clouds:
         target:
             endpoint: http://cfe2.lpds.sztaki.hu:4567
             regionname: ROOT
-        auth_data:
-            OMITTED_FOR_SECURITY; IDEAS:
-            - uds://<user_auth_data> (acq.d by infraprocessor)
-            - file://<path to yaml containing only auth_data> (acq.d by CH)
-            - mapping written directly here (if security is not a concern)
+        auth_data: !yaml_import
+            url: file://auth_data.yaml
         drett_config:
             <<: *DRETT_CONFIG
 node_defs:
