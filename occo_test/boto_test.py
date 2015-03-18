@@ -5,6 +5,7 @@ from nose.tools import ok_, eq_
 import common
 import occo.cloudhandler.backends.boto
 from occo.cloudhandler import CloudHandler
+import occo.util as util
 import yaml
 import logging
 import os
@@ -24,7 +25,8 @@ class BotoTest(unittest.TestCase):
             self.drop_nodes = []
 
         self.cfg = cfg.clouds['boto_lpds_cloud_instance']
-        log.debug('Using Boto config:\n%s', yaml.dump(self.cfg))
+        log.debug('Using Boto config:\n%s',
+                  yaml.dump(util.Cleaner(hide_keys=['password']).deep_copy(self.cfg)))
 
         self.node_def = cfg.node_defs['node1']
 
