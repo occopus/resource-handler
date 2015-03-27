@@ -119,7 +119,7 @@ class BotoCloudHandler(CloudHandler):
         """
         self.conn.terminate_instances(instance_ids=vm_ids)
 
-    @wet_method('occo-dummy-state')
+    @wet_method('running')
     def _get_status(self, vm_id):
         """
         Query VM state.
