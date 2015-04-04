@@ -102,9 +102,14 @@ class BotoCloudHandler(CloudHandler):
         :Remark: This is a "wet method", the VM will not be started
             if the instance is in debug mode (``dry_run``).
         """
-        reservation = self.conn.run_instances(image_id=image_id,
-                                              instance_type=instance_type)
-        return reservation.instances[0].id
+        with drett.Allocation(resource_owner=self.name,
+                              resource_type=self.resource_type,
+                              **self.drett_config) as a:
+            reservation = self.conn.run_instances(image_id=image_id,
+                                                  instance_type=instance_type)
+            vm_id = reservation.instances[0].id
+            a.set_resource_data(vm_id)
+        return vm_id
 
     @wet_method()
     def _delete_vms(self, *vm_ids):
@@ -118,6 +123,12 @@ class BotoCloudHandler(CloudHandler):
             if the instance is in debug mode (``dry_run``).
         """
         self.conn.terminate_instances(instance_ids=vm_ids)
+
+        rt = drett.ResourceTracker(url=self.drett_config['url'])
+        for instance_id in vm_ids:
+            rt.resource_freed_by_attributes(resource_owner=self.name,
+                                            resource_type=self.resource_type,
+                                            resource_id=instance_id)
 
     @wet_method('running')
     def _get_status(self, vm_id):
@@ -144,11 +155,7 @@ class BotoCloudHandler(CloudHandler):
         instance_type = node_description['instance_type']
         context = node_description['context']
 
-        with drett.Allocation(resource_owner=self.name,
-                              resource_type=self.resource_type,
-                              **self.drett_config) as a:
-            vm_id = self._start_instance(image_id, instance_type, context)
-            a.set_resource_data(vm_id)
+        vm_id = self._start_instance(image_id, instance_type, context)
 
         log.debug("[%s] Done; vm_id = %r", self.name, vm_id)
         return vm_id
@@ -164,12 +171,6 @@ class BotoCloudHandler(CloudHandler):
         log.debug("[%s] Dropping node '%s'", self.name, instance_data['node_id'])
 
         self._delete_vms(instance_id)
-
-        drett \
-            .ResourceTracker(url=self.drett_config['url']) \
-            .resource_freed_by_attributes(resource_owner=self.name,
-                                          resource_type=self.resource_type,
-                                          resource_id=instance_id)
 
         log.debug("[%s] Done", self.name)
 
