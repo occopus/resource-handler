@@ -106,7 +106,8 @@ class BotoCloudHandler(CloudHandler):
                               resource_type=self.resource_type,
                               **self.drett_config) as a:
             reservation = self.conn.run_instances(image_id=image_id,
-                                                  instance_type=instance_type)
+                                                  instance_type=instance_type,
+                                                  user_data=context)
             vm_id = reservation.instances[0].id
             a.set_resource_data(vm_id)
         return vm_id
