@@ -10,6 +10,7 @@
 
 __all__ = ['CloudHandler']
 
+import occo.infobroker as ib
 import occo.util.factory as factory
 import yaml
 import logging
@@ -60,3 +61,22 @@ class CloudHandler(factory.MultiBackend):
             Its contents are specified by the sub-class.
         """
         raise NotImplementedError()
+
+
+@ib.provider
+class CloudHandlerProvider(factory.MultiBackend, ib.InfoProvider):
+    def __init__(self, **config):
+        self.__dict__.update(config)
+        self.lookup = dict(
+            ipaddress=self._get_ipaddress
+        )
+
+    def _get_ipaddress(self, instance_id):
+        raise NotImplementedError()
+
+    @ib.provides('node.cloud_attribute')
+    def ch_attribute(self, key, *args, **kwargs):
+        if key in self.lookup:
+            return self.lookup[key](*args, **kwargs)
+        else:
+            raise ArgumentError('Unknown key', key)

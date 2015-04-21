@@ -16,8 +16,8 @@ import boto.ec2
 
 import urlparse
 import occo.util.factory as factory
-from occo.util import wet_method
-from ..cloudhandler import CloudHandler
+from occo.util import wet_method, coalesce
+from ..cloudhandler import CloudHandler, CloudHandlerProvider
 import itertools as it
 import logging
 
@@ -28,6 +28,27 @@ __all__ = ['BotoCloudHandler']
 PROTOCOL_ID='boto'
 
 log = logging.getLogger('occo.cloudhandler.backends.boto')
+
+def setup_connection(target, auth_data):
+    """
+    Setup the connection to the EC2 server.
+    """
+    endpoint = target['endpoint']
+    url = urlparse.urlparse(endpoint)
+    region = boto.ec2.regioninfo.RegionInfo(
+        name=target['regionname'], endpoint=url.hostname)
+    return boto.connect_ec2(
+        aws_access_key_id=auth_data['username'],
+        aws_secret_access_key=auth_data['password'],
+        is_secure=(url.scheme == 'https'),
+        region=region,
+        port=url.port,
+        path=url.path)
+
+def get_instance(conn, instance_id):
+    reservations = conn.get_all_reservations(instance_ids=[instance_id])
+    # TODO: ASSUMING len(reservations)==1 and len(instances)==1
+    return reservations[0].instances[0]
 
 @factory.register(CloudHandler, PROTOCOL_ID)
 class BotoCloudHandler(CloudHandler):
@@ -61,33 +82,11 @@ class BotoCloudHandler(CloudHandler):
         self.dry_run = dry_run
         self.name = name if name else target['endpoint']
         self.drett_config = drett_config
-        self.setup_connection(target, auth_data)
+        self.conn = setup_connection(target, auth_data) \
+            if not dry_run else None
         # The following is intentional. It is a constant yet,
         # but maybe it'll change in the future.
         self.resource_type = 'vm'
-
-    @wet_method()
-    def setup_connection(self, target, auth_data):
-        """
-        Setup the connection to the EC2 server.
-
-        :Remark: This is a "wet method", the connection will not be established
-            if the instance is in debug mode (``dry_run``).
-
-        .. todo::
-            ``target`` and ``auth_data`` should be members of this class.
-        """
-        endpoint = target['endpoint']
-        url = urlparse.urlparse(endpoint)
-        region = boto.ec2.regioninfo.RegionInfo(
-            name=target['regionname'], endpoint=url.hostname)
-        self.conn = boto.connect_ec2(
-            aws_access_key_id=auth_data['username'],
-            aws_secret_access_key=auth_data['password'],
-            is_secure=(url.scheme == 'https'),
-            region=region,
-            port=url.port,
-            path=url.path)
 
     @wet_method(1)
     def _start_instance(self, image_id, instance_type, context):
@@ -141,10 +140,7 @@ class BotoCloudHandler(CloudHandler):
         :Remark: This is a "wet method", if the instance is in debug mode
             (``dry_run``), a dummy value is returned.
         """
-        reservations = self.conn.get_all_reservations(instance_ids=[vm_id])
-        # TODO: ASSUMING len(reservations)==1 and len(instances)==1
-        instance = reservations[0].instances[0]
-        return instance.state
+        return get_instance(self.conn, vm_id).state
 
     def create_node(self, node_description):
         """
@@ -187,3 +183,41 @@ class BotoCloudHandler(CloudHandler):
         retval = self._get_status(instance_data['instance_id'])
         log.debug("[%s] Done; retval='%s'", self.name, retval)
         return retval
+
+@factory.register(CloudHandlerProvider, 'boto')
+class BotoCloudHandlerProvider(CloudHandlerProvider):
+    def __init__(self, target, auth_data,
+                 name=None, dry_run=False,
+                 **config):
+        self.conn = setup_connection(target, auth_data) \
+            if not dry_run else None
+        self.dry_run = dry_run
+        super(BotoCloudHandlerProvider, self).__init__(**config)
+
+    @wet_method('127.0.0.1')
+    def _get_ipaddress(self, instance_id):
+        inst = get_instance(self.conn, instance_id)
+        return coalesce(inst.ip_address, inst.private_ip_address)
+
+    # Possible attributes: ['__class__', '__delattr__', '__dict__', '__doc__',
+    #     '__format__', '__getattribute__', '__hash__', '__init__',
+    #     '__module__', '__new__', '__reduce__', '__reduce_ex__', '__repr__',
+    #     '__setattr__', '__sizeof__', '__str__', '__subclasshook__',
+    #     '__weakref__', '_in_monitoring_element', '_placement',
+    #     '_previous_state', '_state', '_update', 'add_tag', 'add_tags',
+    #     'ami_launch_index', 'architecture', 'block_device_mapping',
+    #     'client_token', 'confirm_product', 'connection', 'create_image',
+    #     'dns_name', 'endElement', 'eventsSet', 'get_attribute',
+    #     'get_console_output', 'group_name', 'groups', 'hypervisor', 'id',
+    #     'image_id', 'instance_profile', 'instance_type', 'interfaces',
+    #     'ip_address', 'item', 'kernel', 'key_name', 'launch_time',
+    #     'modify_attribute', 'monitor', 'monitored', 'monitoring',
+    #     'monitoring_state', 'persistent', 'placement', 'placement_group',
+    #     'placement_tenancy', 'platform', 'previous_state',
+    #     'previous_state_code', 'private_dns_name', 'private_ip_address',
+    #     'product_codes', 'public_dns_name', 'ramdisk', 'reboot', 'region',
+    #     'remove_tag', 'remove_tags', 'requester_id', 'reset_attribute',
+    #     'root_device_name', 'root_device_type', 'spot_instance_request_id',
+    #     'start', 'startElement', 'state', 'state_code', 'state_reason',
+    #     'stop', 'subnet_id', 'tags', 'terminate', 'unmonitor', 'update',
+    #     'use_ip', 'virtualization_type', 'vpc_id']
