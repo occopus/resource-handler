@@ -195,8 +195,8 @@ class BotoCloudHandlerProvider(CloudHandlerProvider):
         super(BotoCloudHandlerProvider, self).__init__(**config)
 
     @wet_method('127.0.0.1')
-    def _get_ipaddress(self, instance_id):
-        inst = get_instance(self.conn, instance_id)
+    def _get_ipaddress(self, instance_data):
+        inst = get_instance(self.conn, instance_data['instance_id'])
         return coalesce(inst.ip_address, inst.private_ip_address)
 
     # Possible attributes: ['__class__', '__delattr__', '__dict__', '__doc__',
