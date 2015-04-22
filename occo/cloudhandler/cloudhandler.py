@@ -79,4 +79,4 @@ class CloudHandlerProvider(factory.MultiBackend, ib.InfoProvider):
         if key in self.lookup:
             return self.lookup[key](*args, **kwargs)
         else:
-            raise ArgumentError('Unknown key', key)
+            raise ib.ArgumentError('Unknown key', key)
