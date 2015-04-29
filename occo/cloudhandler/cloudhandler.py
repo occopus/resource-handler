@@ -67,6 +67,9 @@ class CloudHandler(factory.MultiBackend):
 class CloudHandlerProvider(factory.MultiBackend, ib.InfoProvider):
     def __init__(self, **config):
         self.__dict__.update(config)
+        # This is the alternative to the decorator solution (@provides):
+        # a dict built by hand, forgotten, probably inconsistent.
+        # TODO: rethink actuator lookup
         self.lookup = dict(
             ipaddress=self._get_ipaddress
         )
