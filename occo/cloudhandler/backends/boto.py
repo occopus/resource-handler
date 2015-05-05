@@ -194,10 +194,22 @@ class BotoCloudHandlerProvider(CloudHandlerProvider):
         self.dry_run = dry_run
         super(BotoCloudHandlerProvider, self).__init__(**config)
 
+    @wet_method('running')
+    def _get_state(self, instance_data):
+        inst = get_instance(self.conn, instance_data['instance_id'])
+        return inst.state
+
     @wet_method('127.0.0.1')
-    def _get_ipaddress(self, instance_data):
+    def _get_ip_address(self, instance_data):
         inst = get_instance(self.conn, instance_data['instance_id'])
         return coalesce(inst.ip_address, inst.private_ip_address)
+
+    @wet_method('127.0.0.1')
+    def _get_address(self, instance_data):
+        inst = get_instance(self.conn, instance_data['instance_id'])
+        return coalesce(inst.public_dns_name,
+                        inst.ip_address,
+                        inst.private_ip_address)
 
     # Possible attributes: ['__class__', '__delattr__', '__dict__', '__doc__',
     #     '__format__', '__getattribute__', '__hash__', '__init__',

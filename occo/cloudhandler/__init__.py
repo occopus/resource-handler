@@ -69,19 +69,22 @@ class CloudHandler(factory.MultiBackend):
 class CloudHandlerProvider(factory.MultiBackend, ib.InfoProvider):
     def __init__(self, **config):
         self.__dict__.update(config)
-        # This is the alternative to the decorator solution (@provides):
-        # a dict built by hand, forgotten, probably inconsistent.
-        # TODO: rethink actuator lookup
-        self.lookup = dict(
-            ipaddress=self._get_ipaddress
-        )
 
-    def _get_ipaddress(self, instance_id):
+    @ib.provides('node.resource.state')
+    def get_state(self, instance_data):
+        return self._get_state(instance_data)
+
+    @ib.provides('node.resource.ip_address')
+    def get_ip_address(self, instance_data):
+        return self._get_ip_address(instance_data)
+
+    @ib.provides('node.resource.address')
+    def get_address(self, instance_data):
+        return self._get_address(instance_data)
+
+    def _get_state(self, instance_data):
         raise NotImplementedError()
-
-    @ib.provides('node.cloud_attribute')
-    def ch_attribute(self, key, *args, **kwargs):
-        if key in self.lookup:
-            return self.lookup[key](*args, **kwargs)
-        else:
-            raise ib.ArgumentError('Unknown key', key)
+    def _get_address(self, instance_data):
+        raise NotImplementedError()
+    def _get_ip_address(self, instance_data):
+        raise NotImplementedError()
