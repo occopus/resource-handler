@@ -17,7 +17,7 @@ import boto.ec2
 import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce
-from ..cloudhandler import CloudHandler, CloudHandlerProvider
+from ...cloudhandler import CloudHandler, CloudHandlerProvider
 import itertools as it
 import logging
 
