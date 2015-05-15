@@ -10,4 +10,4 @@ if [ ! -d wheelhouse ]; then
     fi
 fi
 
-scp wheelhouse/* root@c153-86.localcloud:/opt/pypi-server/packages
+scp wheelhouse/* root@c155-10.localcloud:/opt/pypi-server/packages
