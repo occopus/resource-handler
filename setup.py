@@ -1,4 +1,4 @@
-#!/usr/bin/env -e python
+#!/usr/bin/env python
 
 import setuptools
 from pip.req import parse_requirements
@@ -8,10 +8,13 @@ setuptools.setup(
     version='0.1.0',
     author='Adam Visegradi',
     author_email='adam.visegradi@sztaki.mta.hu',
-    namespace_packages=['occo', 'occo.cloudhandler.backends'],
-    py_modules=['occo.cloudhandler.backends.dummy',
+    namespace_packages=['occo',
+                        'occo.cloudhandler',
+                        'occo.cloudhandler.backends'],
+    py_modules=['occo.cloudhandler.common',
+                'occo.cloudhandler.backends.dummy',
                 'occo.cloudhandler.backends.boto'],
-    packages=['occo.cloudhandler'],
+    packages=setuptools.find_packages(),
     scripts=[],
     url='http://www.lpds.sztaki.hu/',
     license='LICENSE.txt',

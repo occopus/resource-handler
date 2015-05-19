@@ -11,7 +11,7 @@
 import occo.util as util
 import occo.util.config as config
 import occo.util.factory as factory
-from ...cloudhandler import CloudHandler
+from ..common import CloudHandler
 import logging
 import time
 import random
