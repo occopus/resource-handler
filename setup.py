@@ -9,6 +9,7 @@ setuptools.setup(
     author='Adam Visegradi',
     author_email='adam.visegradi@sztaki.mta.hu',
     namespace_packages=['occo',
+                        'occo.cloudhandler',
                         'occo.cloudhandler.backends'],
     py_modules=['occo.cloudhandler.common',
                 'occo.cloudhandler.backends.dummy',
