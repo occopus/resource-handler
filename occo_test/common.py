@@ -11,8 +11,6 @@ cfg = object()
 
 def configure():
     global cfg
-    util.set_config_base_dir('etc/occo')
-    with open('occo_test/test.yaml') as f:
-        cfg = config.DefaultYAMLConfig(f)
+    cfg = config.DefaultYAMLConfig('occo_test/test.yaml')
     logging.config.dictConfig(cfg.logging)
     return cfg

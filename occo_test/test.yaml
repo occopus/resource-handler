@@ -5,7 +5,7 @@ drett_config: &DRETT_CONFIG
     timeout: 600
 default_mqconfig: &MQCFG
     protocol: amqp
-    host: c153-33.localcloud
+    host: localhost
     vhost: test
     exhange: ''
     routing_key: ''
