@@ -32,7 +32,7 @@ class BotoTest(unittest.TestCase):
 
     def test_full_dryrun(self):
         self.cfg['dry_run'] = True
-        self.ch = CloudHandler(**self.cfg)
+        self.ch = CloudHandler.instantiate(**self.cfg)
         nid = self.ch.create_node(self.node_def)
         try:
             log.debug(self.ch.get_node_state(dict(instance_id=nid, node_id="test")))
@@ -46,7 +46,7 @@ class BotoTest(unittest.TestCase):
     
     def test_create_node(self):
         self.cfg['dry_run'] = False
-        self.ch = CloudHandler(**self.cfg)
+        self.ch = CloudHandler.instantiate(**self.cfg)
 	log.debug("node_desc: %r", self.node_def)
         nid = self.ch.create_node(self.node_def)
         log.debug("Resource acquired; node_id = '%s'", nid)
@@ -55,7 +55,7 @@ class BotoTest(unittest.TestCase):
 
     def test_drop_node(self):
         self.cfg['dry_run'] = False
-        self.ch = CloudHandler(**self.cfg)
+        self.ch = CloudHandler.instantiate(**self.cfg)
         remaining = []
         last_exception = None
         for i in self.drop_nodes:
@@ -74,7 +74,7 @@ class BotoTest(unittest.TestCase):
 
     def test_node_status(self):
         self.cfg['dry_run'] = False
-        self.ch = CloudHandler(**self.cfg)
+        self.ch = CloudHandler.instantiate(**self.cfg)
         last_exception = None
         for i in self.drop_nodes:
             try:
