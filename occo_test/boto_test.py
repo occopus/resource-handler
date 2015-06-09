@@ -4,7 +4,7 @@ import unittest
 from nose.tools import ok_, eq_
 import common
 import occo.cloudhandler.backends.boto
-from occo.cloudhandler import CloudHandler
+from occo.cloudhandler.common import CloudHandler
 import occo.util as util
 import yaml
 import logging
