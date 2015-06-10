@@ -1,0 +1,8 @@
+protocol: amqp
+host: localhost
+vhost: test
+exhange: ''
+routing_key: ''
+user: test
+password: test
+queue: test

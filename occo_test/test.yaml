@@ -3,15 +3,8 @@ drett_config: &DRETT_CONFIG
     application: occo-test
     module: boto-handler
     timeout: 600
-default_mqconfig: &MQCFG
-    protocol: amqp
-    host: localhost
-    vhost: test
-    exhange: ''
-    routing_key: ''
-    user: test
-    password: test
-    queue: test
+default_mqconfig: !yaml_import &MQCFG
+    url: file://mqcfg.yaml
 ip_mqconfig: &IP_MQCFG
     <<: *MQCFG
     queue: remote_infobroker_test
@@ -49,38 +42,5 @@ node_defs:
         instance_type: m1.small
         context: ''
         name: node1
-logging:
-    version: 1
-    root:
-        level: DEBUG
-        handlers: [console, file]
-    formatters:
-        simpleFormater:
-            format: "%(asctime)s\t%(levelname)s\t%(threadName)s\t%(message)s"
-#            datefmt: '%Y-%m-%d %H:%M:%S.%f'
-
-    handlers:
-        console:
-            class: logging.StreamHandler
-            formatter: simpleFormater
-            level: DEBUG
-            stream: ext://sys.stdout
-        file:
-            class : logging.FileHandler
-            formatter: simpleFormater
-            level: DEBUG
-            filename: rabbit.log
-
-    loggers:
-        pika:
-            propagate: false
-            level: ERROR
-            handlers: [console]
-        occo:
-            propagate: false
-            level: DEBUG
-            handlers: [console, file]
-        occo_test:
-            propagate: false
-            level: DEBUG
-            handlers: [console, file]
+logging: !yaml_import
+    url: file://logging.yaml
