@@ -1,3 +1,4 @@
+skip_backend_tests: false
 drett_config: &DRETT_CONFIG
     url: http://c153-40.localcloud:5002/drett
     application: occo-test
@@ -38,6 +39,9 @@ clouds:
             <<: *DRETT_CONFIG
 node_defs:
     node1:
+        implementation_type: cooked
+        backend_id: dummy
+        servicecomposer_id: dummy
         image_id: ami-00001082 # Ubuntu 14.04 cloud-init
         instance_type: m1.small
         context: ''
