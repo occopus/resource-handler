@@ -21,4 +21,6 @@ wsgiref==0.1.2
 
 -e ../util
 -e ../info-broker
+-e ../infrastructure-processor
+-e ../service-composer
 -e .
