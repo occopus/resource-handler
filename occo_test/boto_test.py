@@ -17,7 +17,7 @@ DROP_NODES_FILE = 'occo_test/drop_nodes.yaml'
 cfg = common.configure()
 
 real_resource = unittest.skipIf(getattr(cfg, 'skip_backend_tests', False),
-                                 'Omitting tests using real resources')
+                                'Omitting tests using real resources')
 
 class BotoTest(unittest.TestCase):
     def setUp(self):
@@ -46,12 +46,12 @@ class BotoTest(unittest.TestCase):
         with open(DROP_NODES_FILE, 'w') as f:
             f.write(yaml.dump(self.drop_nodes))
             log.debug("Allocated nodes: %r", self.drop_nodes)
-    
+
     @real_resource
     def test_create_node(self):
         self.cfg['dry_run'] = False
         self.ch = CloudHandler.instantiate(**self.cfg)
-	log.debug("node_desc: %r", self.node_def)
+        log.debug("node_desc: %r", self.node_def)
         nid = self.ch.create_node(self.node_def)
         log.debug("Resource acquired; node_id = '%s'", nid)
         self.drop_nodes.append(dict(instance_id=nid, node_id="test"))
