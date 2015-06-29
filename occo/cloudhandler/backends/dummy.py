@@ -51,7 +51,7 @@ class DummyCloudHandler(CloudHandler):
 
         node_instance = dict(
             instance_id=uid,
-            environment_id=node_description['environment_id'],
+            infra_id=node_description['infra_id'],
             node_id=node_description['id'],
             node_type=node_description['name'],
             running=False)

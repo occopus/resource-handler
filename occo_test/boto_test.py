@@ -85,14 +85,14 @@ class BotoTest(unittest.TestCase):
         eid = str(uuid.uuid4())
         nid = str(uuid.uuid4())
         node_desc = dict(
-            environment_id=eid,
+            infra_id=eid,
             node_id=nid,
             type='test',
             user_id=1,
             name='test')
         infrap = ip.InfraProcessor.instantiate(
             'basic', self.uds, self.ch, self.sc)
-        cmd_cre = infrap.cri_create_env(eid)
+        cmd_cre = infrap.cri_create_infrastructure(eid)
         cmd_crn = infrap.cri_create_node(node_desc)
         infrap.push_instructions(cmd_cre)
         node = infrap.push_instructions(cmd_crn)[0]

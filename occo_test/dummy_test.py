@@ -13,7 +13,7 @@ class DummyTest(unittest.TestCase):
     def test_create_node(self):
         nd = dict()
         nd['id'] = 'test_node_id'
-        nd['environment_id'] = 'test_env_id'
+        nd['infra_id'] = 'test_infra_id'
         nd['name'] = 'test_name'
         nid = self.ch.create_node(nd)
         self.assertIsNotNone(nid)
@@ -23,7 +23,7 @@ class DummyTest(unittest.TestCase):
     def test_node_state(self):
         nd = dict()
         nd['id'] = 'test_node_id'
-        nd['environment_id'] = 'test_env_id'
+        nd['infra_id'] = 'test_infra_id'
         nd['name'] = 'test_name'
         nid = self.ch.create_node(nd)
         instance_data = dict()
@@ -32,7 +32,7 @@ class DummyTest(unittest.TestCase):
     def test_drop_node(self):
         nd = dict()
         nd['id'] = 'test_node_id'
-        nd['environment_id'] = 'test_env_id'
+        nd['infra_id'] = 'test_infra_id'
         nd['name'] = 'test_name'
         nid = self.ch.create_node(nd)
         instance_data = dict()
