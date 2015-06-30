@@ -142,15 +142,16 @@ class BotoCloudHandler(CloudHandler):
         """
         return get_instance(self.conn, vm_id).state
 
-    def create_node(self, node_description):
+    def create_node(self, resolved_node_definition):
         """
-        Crete node based on its :ref:`node description <nodedescription>`.
+        Crete node based on its
+        :ref:`definition <resolved-node-definition>`.
         """
         log.debug("[%s] Creating node: %r",
-                  self.name, node_description['name'])
-        image_id = node_description['image_id']
-        instance_type = node_description['instance_type']
-        context = node_description['context']
+                  self.name, resolved_node_definition['name'])
+        image_id = resolved_node_definition['image_id']
+        instance_type = resolved_node_definition['instance_type']
+        context = resolved_node_definition['context']
 
         vm_id = self._start_instance(image_id, instance_type, context)
 

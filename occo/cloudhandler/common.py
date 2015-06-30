@@ -38,11 +38,11 @@ class CloudHandler(factory.MultiBackend):
     def __init__(self, **config):
         self.__dict__.update(config)
 
-    def create_node(self, node_description):
+    def create_node(self, resolved_node_definition):
         """ Instantiate a node.
 
-        :param node_description: Information required to instantiate the node.
-            Its contents are specified by the sub-class.
+        :param resolved_node_definition: Information required to instantiate
+            the node. Its contents are specified by the sub-class.
         """
         raise NotImplementedError()
 

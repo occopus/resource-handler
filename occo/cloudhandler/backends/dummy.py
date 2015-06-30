@@ -41,8 +41,8 @@ class DummyCloudHandler(CloudHandler):
         self.kvstore = kvstore
         self.delayed = config.get('delayed', False)
 
-    def create_node(self, node_description):
-        log.debug("[CH] Creating node: %r", node_description)
+    def create_node(self, resolved_node_definition):
+        log.debug("[CH] Creating node: %r", resolved_node_definition)
 
         if self.delayed:
             time.sleep(3 + max(-2, random.normalvariate(0, 0.5)))
@@ -51,9 +51,9 @@ class DummyCloudHandler(CloudHandler):
 
         node_instance = dict(
             instance_id=uid,
-            infra_id=node_description['infra_id'],
-            node_id=node_description['id'],
-            node_type=node_description['name'],
+            infra_id=resolved_node_definition['infra_id'],
+            node_id=resolved_node_definition['id'],
+            node_type=resolved_node_definition['name'],
             running=False)
 
         self.kvstore[uid] = node_instance
