@@ -23,6 +23,8 @@ import logging
 
 import drett.client as drett
 
+import occo.util.constants.status as status
+
 __all__ = ['BotoCloudHandler']
 
 PROTOCOL_ID='boto'
@@ -182,8 +184,24 @@ class BotoCloudHandler(CloudHandler):
         log.debug("[%s] Acquiring node state for '%s'",
                   self.name, instance_data['node_id'])
         retval = self._get_status(instance_data['instance_id'])
-        log.debug("[%s] Done; retval='%s'", self.name, retval)
-        return retval
+        if retval=="pending":
+            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+                      retval, status.PENDING)
+            return status.PENDING
+        elif retval=="running":
+            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+                      retval, status.READY)
+            return status.READY
+        elif retval=="shutting-down" or retval=="terminated":
+            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+                      retval, status.SHUTDOWN)
+            return status.SHUTDOWN
+        elif retval=="stopping" or retval=="stopped":
+            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+                      retval, status.TMP_FAIL)
+            return status.TMP_FAIL
+        else:
+            raise NotImplementedError()
 
 @factory.register(CloudHandlerProvider, 'boto')
 class BotoCloudHandlerProvider(CloudHandlerProvider):
