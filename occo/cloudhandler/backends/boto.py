@@ -171,6 +171,7 @@ class BotoCloudHandlerProvider(CloudHandlerProvider):
             if not dry_run else None
         self.dry_run = dry_run
         super(BotoCloudHandlerProvider, self).__init__(**config)
+        self.name = name
 
     @wet_method('running')
     def _get_state(self, instance_data):
