@@ -132,18 +132,6 @@ class BotoCloudHandler(CloudHandler):
                                             resource_type=self.resource_type,
                                             resource_id=instance_id)
 
-    @wet_method('running')
-    def _get_status(self, vm_id):
-        """
-        Query VM state.
-
-        :param str vm_id: The VM instance identifier.
-
-        :Remark: This is a "wet method", if the instance is in debug mode
-            (``dry_run``), a dummy value is returned.
-        """
-        return get_instance(self.conn, vm_id).state
-
     def create_node(self, resolved_node_definition):
         """
         Crete node based on its
@@ -174,16 +162,20 @@ class BotoCloudHandler(CloudHandler):
 
         log.debug("[%s] Done", self.name)
 
-    def get_node_state(self, instance_data):
-        """
-        Query a VM's state.
+@factory.register(CloudHandlerProvider, 'boto')
+class BotoCloudHandlerProvider(CloudHandlerProvider):
+    def __init__(self, target, auth_data,
+                 name=None, dry_run=False,
+                 **config):
+        self.conn = setup_connection(target, auth_data) \
+            if not dry_run else None
+        self.dry_run = dry_run
+        super(BotoCloudHandlerProvider, self).__init__(**config)
 
-        :param instance_data: Information necessary to access the VM instance.
-        :type instance_data: :ref:`Instance Data <instancedata>`
-        """
-        log.debug("[%s] Acquiring node state for '%s'",
-                  self.name, instance_data['node_id'])
-        retval = self._get_status(instance_data['instance_id'])
+    @wet_method('running')
+    def _get_state(self, instance_data):
+        inst = get_instance(self.conn, instance_data['instance_id'])
+        retval = inst.state
         if retval=="pending":
             log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
                       retval, status.PENDING)
@@ -203,20 +195,7 @@ class BotoCloudHandler(CloudHandler):
         else:
             raise NotImplementedError()
 
-@factory.register(CloudHandlerProvider, 'boto')
-class BotoCloudHandlerProvider(CloudHandlerProvider):
-    def __init__(self, target, auth_data,
-                 name=None, dry_run=False,
-                 **config):
-        self.conn = setup_connection(target, auth_data) \
-            if not dry_run else None
-        self.dry_run = dry_run
-        super(BotoCloudHandlerProvider, self).__init__(**config)
 
-    @wet_method('running')
-    def _get_state(self, instance_data):
-        inst = get_instance(self.conn, instance_data['instance_id'])
-        return inst.state
 
     @wet_method('127.0.0.1')
     def _get_ip_address(self, instance_data):
