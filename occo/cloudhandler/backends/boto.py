@@ -23,7 +23,7 @@ import logging
 
 import drett.client as drett
 
-import occo.util.constants.status as status
+import occo.constants.status as status
 
 __all__ = ['BotoCloudHandler']
 
