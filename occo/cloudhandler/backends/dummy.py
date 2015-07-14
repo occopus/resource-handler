@@ -82,5 +82,5 @@ class DummyCloudHandler(CloudHandler, CloudHandlerProvider):
         n = self.kvstore[node_id]
         return \
             'unknown' if not n \
-            else 'running' if n['running'] \
+            else 'ready' if n['running'] \
             else 'pending'
