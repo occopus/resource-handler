@@ -61,6 +61,7 @@ class BotoTest(unittest.TestCase):
 
         try:
             log.debug(mib.get('node.resource.state',dict(instance_id=nid,
+                                                         node_id="test")))
         finally:
             self.ch.drop_node(dict(instance_id=nid, node_id="test"))
 
