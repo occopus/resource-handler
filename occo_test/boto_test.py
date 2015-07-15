@@ -96,7 +96,7 @@ class BotoTest(unittest.TestCase):
         cmd_crn = infrap.cri_create_node(node_desc)
         infrap.push_instructions(cmd_cre)
         node = infrap.push_instructions(cmd_crn)[0]
-        status = self.ch.get_node_state(node)
+        status = mib.get('node.resource.state', node)
         self.drop_nodes.append(dict(instance_id=nid, node_id="test"))
 
     @real_resource
@@ -124,9 +124,21 @@ class BotoTest(unittest.TestCase):
         self.cfg['dry_run'] = False
         self.ch = CloudHandler.instantiate(**self.cfg)
         last_exception = None
+
+        self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
+        self.uds = UDS.instantiate(protocol='dict')
+        self.uds.kvstore.set_item('node_def:test', [self.node_def])
+        mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
+            self.uds,
+            self.sc,
+            cp.CloudInfoProvider(self.sc, self.ch),
+            sp.SynchronizationProvider(),
+            bt.BotoCloudHandlerProvider(**self.cfg)
+        ])
+
         for i in self.drop_nodes:
             try:
-                node_state = self.ch.get_node_state(i)
+                node_state = mib.get('node.resource.state', i)
                 log.info("Status of node '%s' is '%s'", i, node_state)
             except Exception as ex:
                 log.exception('Failure:')
