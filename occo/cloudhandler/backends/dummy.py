@@ -12,6 +12,7 @@ import occo.util as util
 import occo.util.config as config
 import occo.util.factory as factory
 from ..common import CloudHandler
+from ..common import CloudHandlerProvider
 import logging
 import time
 import random
@@ -24,7 +25,7 @@ __all__ = ['DummyCloudHandler']
 log = logging.getLogger('occo.cloudhandler.backends.dummy')
 
 @factory.register(CloudHandler, PROTOCOL_ID)
-class DummyCloudHandler(CloudHandler):
+class DummyCloudHandler(CloudHandler, CloudHandlerProvider):
     """ Dummy implementation of the
     :class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
 
@@ -40,6 +41,7 @@ class DummyCloudHandler(CloudHandler):
     def __init__(self, kvstore, **config):
         self.kvstore = kvstore
         self.delayed = config.get('delayed', False)
+        CloudHandlerProvider.__init__(self, **config)
 
     def create_node(self, resolved_node_definition):
         log.debug("[CH] Creating node: %r", resolved_node_definition)
@@ -74,7 +76,7 @@ class DummyCloudHandler(CloudHandler):
         self.kvstore[node_id] = None
         log.debug("[CH] Done")
 
-    def get_node_state(self, instance_data):
+    def get_state(self, instance_data):
         node_id = instance_data['instance_id']
         log.debug("[CH] Acquiring node state for '%s'", node_id)
         n = self.kvstore[node_id]
