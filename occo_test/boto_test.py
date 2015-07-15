@@ -47,8 +47,20 @@ class BotoTest(unittest.TestCase):
         self.cfg['dry_run'] = True
         self.ch = CloudHandler.instantiate(**self.cfg)
         nid = self.ch.create_node(self.node_def)
+
+        self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
+        self.uds = UDS.instantiate(protocol='dict')
+        self.uds.kvstore.set_item('node_def:test', [self.node_def])
+        mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
+            self.uds,
+            self.sc,
+            cp.CloudInfoProvider(self.sc, self.ch),
+            sp.SynchronizationProvider(),
+            bt.BotoCloudHandlerProvider(**self.cfg)
+        ])
+
         try:
-            log.debug(self.ch.get_node_state(dict(instance_id=nid, node_id="test")))
+            log.debug(mib.get('node.resource.state',dict(instance_id=nid,
         finally:
             self.ch.drop_node(dict(instance_id=nid, node_id="test"))
 
