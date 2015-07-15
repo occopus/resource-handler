@@ -54,15 +54,6 @@ class CloudHandler(factory.MultiBackend):
         """
         raise NotImplementedError()
 
-    def get_node_state(self, instance_data):
-        """ Query instance information.
-
-        :param instance_data: Information required to perform the query.
-            Its contents are specified by the sub-class.
-        """
-        raise NotImplementedError()
-
-
 @ib.provider
 class CloudHandlerProvider(factory.MultiBackend, ib.InfoProvider):
     def __init__(self, **config):

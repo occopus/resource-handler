@@ -23,6 +23,8 @@ import logging
 
 import drett.client as drett
 
+import occo.constants.status as status
+
 __all__ = ['BotoCloudHandler']
 
 PROTOCOL_ID='boto'
@@ -130,18 +132,6 @@ class BotoCloudHandler(CloudHandler):
                                             resource_type=self.resource_type,
                                             resource_id=instance_id)
 
-    @wet_method('running')
-    def _get_status(self, vm_id):
-        """
-        Query VM state.
-
-        :param str vm_id: The VM instance identifier.
-
-        :Remark: This is a "wet method", if the instance is in debug mode
-            (``dry_run``), a dummy value is returned.
-        """
-        return get_instance(self.conn, vm_id).state
-
     def create_node(self, resolved_node_definition):
         """
         Crete node based on its
@@ -172,19 +162,6 @@ class BotoCloudHandler(CloudHandler):
 
         log.debug("[%s] Done", self.name)
 
-    def get_node_state(self, instance_data):
-        """
-        Query a VM's state.
-
-        :param instance_data: Information necessary to access the VM instance.
-        :type instance_data: :ref:`Instance Data <instancedata>`
-        """
-        log.debug("[%s] Acquiring node state for '%s'",
-                  self.name, instance_data['node_id'])
-        retval = self._get_status(instance_data['instance_id'])
-        log.debug("[%s] Done; retval='%s'", self.name, retval)
-        return retval
-
 @factory.register(CloudHandlerProvider, 'boto')
 class BotoCloudHandlerProvider(CloudHandlerProvider):
     def __init__(self, target, auth_data,
@@ -194,11 +171,32 @@ class BotoCloudHandlerProvider(CloudHandlerProvider):
             if not dry_run else None
         self.dry_run = dry_run
         super(BotoCloudHandlerProvider, self).__init__(**config)
+        self.name = name
 
     @wet_method('running')
     def _get_state(self, instance_data):
         inst = get_instance(self.conn, instance_data['instance_id'])
-        return inst.state
+        retval = inst.state
+        if retval=="pending":
+            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+                      retval, status.PENDING)
+            return status.PENDING
+        elif retval=="running":
+            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+                      retval, status.READY)
+            return status.READY
+        elif retval=="shutting-down" or retval=="terminated":
+            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+                      retval, status.SHUTDOWN)
+            return status.SHUTDOWN
+        elif retval=="stopping" or retval=="stopped":
+            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+                      retval, status.TMP_FAIL)
+            return status.TMP_FAIL
+        else:
+            raise NotImplementedError()
+
+
 
     @wet_method('127.0.0.1')
     def _get_ip_address(self, instance_data):

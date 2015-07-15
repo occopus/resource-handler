@@ -28,7 +28,7 @@ class DummyTest(unittest.TestCase):
         nid = self.ch.create_node(nd)
         instance_data = dict()
         instance_data['instance_id'] = nid
-        eq_(self.ch.get_node_state(instance_data), 'running')
+        eq_(self.ch.get_state(instance_data), 'ready')
     def test_drop_node(self):
         nd = dict()
         nd['id'] = 'test_node_id'
@@ -38,6 +38,6 @@ class DummyTest(unittest.TestCase):
         instance_data = dict()
         instance_data['instance_id'] = nid
         self.ch.drop_node(instance_data)
-        s = self.ch.get_node_state(instance_data)
+        s = self.ch.get_state(instance_data)
         eq_(s, 'unknown')
 
