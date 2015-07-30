@@ -156,7 +156,7 @@ class BotoCloudHandler(CloudHandler):
         :type instance_data: :ref:`Instance Data <instancedata>`
         """
         instance_id = instance_data['instance_id']
-        log.debug("[%s] Dropping node '%s'", self.name, instance_data['node_id'])
+        log.debug("[%s] Dropping node %r", self.name, instance_data['node_id'])
 
         self._delete_vms(instance_id)
 
@@ -178,19 +178,19 @@ class BotoCloudHandlerProvider(CloudHandlerProvider):
         inst = get_instance(self.conn, instance_data['instance_id'])
         retval = inst.state
         if retval=="pending":
-            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+            log.debug("[%s] Done; retval=%r; status=%r",self.name,
                       retval, status.PENDING)
             return status.PENDING
         elif retval=="running":
-            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+            log.debug("[%s] Done; retval=%r; status=%r",self.name,
                       retval, status.READY)
             return status.READY
         elif retval=="shutting-down" or retval=="terminated":
-            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+            log.debug("[%s] Done; retval=%r; status=%r",self.name,
                       retval, status.SHUTDOWN)
             return status.SHUTDOWN
         elif retval=="stopping" or retval=="stopped":
-            log.debug("[%s] Done; retval='%s'; status='%s'",self.name,
+            log.debug("[%s] Done; retval=%r; status=%r",self.name,
                       retval, status.TMP_FAIL)
             return status.TMP_FAIL
         else:

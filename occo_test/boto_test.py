@@ -76,7 +76,7 @@ class BotoTest(unittest.TestCase):
         self.ch = CloudHandler.instantiate(**self.cfg)
         log.debug("node_desc: %r", self.node_def)
         nid = self.ch.create_node(self.node_def)
-        log.debug("Resource acquired; node_id = '%s'", nid)
+        log.debug("Resource acquired; node_id = %r", nid)
         self.drop_nodes.append(dict(instance_id=nid, node_id="test"))
         self.update_drop_nodes()
 
@@ -152,7 +152,7 @@ class BotoTest(unittest.TestCase):
         for i in self.drop_nodes:
             try:
                 node_state = mib.get('node.resource.state', i)
-                log.info("Status of node '%s' is '%s'", i, node_state)
+                log.info("Status of node %r is %r", i, node_state)
             except Exception as ex:
                 log.exception('Failure:')
                 last_exception = ex
