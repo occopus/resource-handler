@@ -54,26 +54,30 @@ class CloudHandler(factory.MultiBackend):
         """
         raise NotImplementedError()
 
+    def get_state(self, instance_data):
+        raise NotImplementedError()
+
+    def get_adress(self, instance_data):
+        raise NotImplementedError()
+
+    def get_ip_adress(self, instance_data):
+        raise NotImplementedError()
+
 @ib.provider
-class CloudHandlerProvider(factory.MultiBackend, ib.InfoProvider):
-    def __init__(self, **config):
+class CloudHandlerProvider(b.InfoProvider):
+    def __init__(self, cloud_handler, **config):
         self.__dict__.update(config)
+        self.cloud_handler = cloud_handler
 
     @ib.provides('node.resource.state')
     def get_state(self, instance_data):
-        return self._get_state(instance_data)
+        return self.cloud_handler.get_state(instance_data)
 
     @ib.provides('node.resource.ip_address')
     def get_ip_address(self, instance_data):
-        return self._get_ip_address(instance_data)
+        return self.cloud_handler.get_ip_address(instance_data)
 
     @ib.provides('node.resource.address')
     def get_address(self, instance_data):
-        return self._get_address(instance_data)
+        return self.cloud_handler.get_address(instance_data)
 
-    def _get_state(self, instance_data):
-        raise NotImplementedError()
-    def _get_address(self, instance_data):
-        raise NotImplementedError()
-    def _get_ip_address(self, instance_data):
-        raise NotImplementedError()

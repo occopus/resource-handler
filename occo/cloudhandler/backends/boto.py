@@ -162,19 +162,8 @@ class BotoCloudHandler(CloudHandler):
 
         log.debug("[%s] Done", self.name)
 
-@factory.register(CloudHandlerProvider, 'boto')
-class BotoCloudHandlerProvider(CloudHandlerProvider):
-    def __init__(self, target, auth_data,
-                 name=None, dry_run=False,
-                 **config):
-        self.conn = setup_connection(target, auth_data) \
-            if not dry_run else None
-        self.dry_run = dry_run
-        super(BotoCloudHandlerProvider, self).__init__(**config)
-        self.name = name
-
     @wet_method('running')
-    def _get_state(self, instance_data):
+    def get_state(self, instance_data):
         inst = get_instance(self.conn, instance_data['instance_id'])
         retval = inst.state
         if retval=="pending":
@@ -196,19 +185,65 @@ class BotoCloudHandlerProvider(CloudHandlerProvider):
         else:
             raise NotImplementedError()
 
-
-
     @wet_method('127.0.0.1')
-    def _get_ip_address(self, instance_data):
+    def get_ip_address(self, instance_data):
         inst = get_instance(self.conn, instance_data['instance_id'])
         return coalesce(inst.ip_address, inst.private_ip_address)
 
     @wet_method('127.0.0.1')
-    def _get_address(self, instance_data):
+    def get_address(self, instance_data):
         inst = get_instance(self.conn, instance_data['instance_id'])
         return coalesce(inst.public_dns_name,
                         inst.ip_address,
                         inst.private_ip_address)
+
+#@factory.register(CloudHandlerProvider, 'boto')
+#class BotoCloudHandlerProvider(CloudHandlerProvider):
+#    def __init__(self, target, auth_data,
+#                 name=None, dry_run=False,
+#                 **config):
+#        self.conn = setup_connection(target, auth_data) \
+#            if not dry_run else None
+#        self.dry_run = dry_run
+#        super(BotoCloudHandlerProvider, self).__init__(**config)
+#        self.name = name
+
+#    @wet_method('running')
+#    def _get_state(self, instance_data):
+#       inst = get_instance(self.conn, instance_data['instance_id'])
+#        retval = inst.state
+#        if retval=="pending":
+#            log.debug("[%s] Done; retval=%r; status=%r",self.name,
+#                      retval, status.PENDING)
+#            return status.PENDING
+#        elif retval=="running":
+#            log.debug("[%s] Done; retval=%r; status=%r",self.name,
+#                      retval, status.READY)
+#            return status.READY
+#        elif retval=="shutting-down" or retval=="terminated":
+#            log.debug("[%s] Done; retval=%r; status=%r",self.name,
+#                      retval, status.SHUTDOWN)
+#            return status.SHUTDOWN
+#        elif retval=="stopping" or retval=="stopped":
+#            log.debug("[%s] Done; retval=%r; status=%r",self.name,
+#                      retval, status.TMP_FAIL)
+#            return status.TMP_FAIL
+#        else:
+#            raise NotImplementedError()
+
+
+
+#    @wet_method('127.0.0.1')
+#    def _get_ip_address(self, instance_data):
+#        inst = get_instance(self.conn, instance_data['instance_id'])
+#        return coalesce(inst.ip_address, inst.private_ip_address)
+
+#    @wet_method('127.0.0.1')
+#    def _get_address(self, instance_data):
+#        inst = get_instance(self.conn, instance_data['instance_id'])
+#        return coalesce(inst.public_dns_name,
+#                        inst.ip_address,
+#                        inst.private_ip_address)
 
     # Possible attributes: ['__class__', '__delattr__', '__dict__', '__doc__',
     #     '__format__', '__getattribute__', '__hash__', '__init__',
