@@ -14,8 +14,16 @@ import occo.infobroker as ib
 import occo.util.factory as factory
 import yaml
 import logging
+import time
 
 log = logging.getLogger('occo.cloudhandler')
+
+class Command(object):
+    def __init__(self):
+   
+    def perform(self, cloud_handler):
+        """Perform the algorithm represented by this command."""
+        raise NotImplementedError()
 
 class CloudHandler(factory.MultiBackend):
     """
@@ -38,7 +46,10 @@ class CloudHandler(factory.MultiBackend):
     def __init__(self, **config):
         self.__dict__.update(config)
 
-    def create_node(self, resolved_node_definition):
+    def perform(self, instruction):
+        instruction.perform(self)
+
+    def cri_create_node(self, resolved_node_definition):
         """ Instantiate a node.
 
         :param resolved_node_definition: Information required to instantiate
@@ -46,7 +57,7 @@ class CloudHandler(factory.MultiBackend):
         """
         raise NotImplementedError()
 
-    def drop_node(self, instance_data):
+    def cri_drop_node(self, instance_data):
         """ Destroy a node instance.
 
         :param instance_data: Information required to destroy a node instance.
@@ -54,13 +65,13 @@ class CloudHandler(factory.MultiBackend):
         """
         raise NotImplementedError()
 
-    def get_state(self, instance_data):
+    def cri_get_state(self, instance_data):
         raise NotImplementedError()
 
-    def get_adress(self, instance_data):
+    def cri_get_adress(self, instance_data):
         raise NotImplementedError()
 
-    def get_ip_adress(self, instance_data):
+    def cri_get_ip_adress(self, instance_data):
         raise NotImplementedError()
 
 @ib.provider

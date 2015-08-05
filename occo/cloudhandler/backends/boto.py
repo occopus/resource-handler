@@ -17,7 +17,7 @@ import boto.ec2
 import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce
-from ..common import CloudHandler, CloudHandlerProvider
+from ..common import CloudHandler, Command
 import itertools as it
 import logging
 
@@ -51,6 +51,139 @@ def get_instance(conn, instance_id):
     reservations = conn.get_all_reservations(instance_ids=[instance_id])
     # TODO: ASSUMING len(reservations)==1 and len(instances)==1
     return reservations[0].instances[0]
+
+##############
+## CH Commands
+
+class CreateNode(Command):
+    def __init__(self, resolved_node_definition):
+        Command.__init__(self)
+        self.resolved_node_definition = resolved_node_definiton
+
+    @wet_method(1)
+    def _start_instance(self, cloud_handler, image_id, instance_type, context):
+        """
+        Start the VM instance.
+
+        :param str image_id: The image identifier in the backend cloud.
+        :param str instance_type: The instance type as specified by the
+            backend cloud (e.g. m1.small).
+        :param str context: Contextualization for the VM instane.
+
+        :Remark: This is a "wet method", the VM will not be started
+            if the instance is in debug mode (``dry_run``).
+        """
+        with drett.Allocation(resource_owner=cloud_handler.name,
+                              resource_type=cloud_handler.resource_type,
+                              **cloud_handler.drett_config) as a:
+            reservation = cloud_handler.conn.run_instances(image_id=image_id,
+                                                  instance_type=instance_type,
+                                                  user_data=context)
+            vm_id = reservation.instances[0].id
+            a.set_resource_data(vm_id)
+        return vm_id
+
+    def perform(self, cloud_handler):
+        log.debug("[%s] Creating node: %r",
+                  cloud_handler.name, self.resolved_node_definition['name'])
+        image_id = self.resolved_node_definition['image_id']
+        instance_type = self.resolved_node_definition['instance_type']
+        context = self.resolved_node_definition['context']
+
+        vm_id = self._start_instance(cloud_handler, image_id, instance_type, context)
+
+        log.debug("[%s] Done; vm_id = %r", cloud_handler.name, vm_id)
+        return vm_id
+
+class DropNode(Command):
+    def __init__(self, instance_data):
+        Command.__init__(self)
+        self.instance_data = instance_data    
+    
+    @wet_method()
+    def _delete_vms(self, cloud_handler, *vm_ids):
+        """
+        Terminate VM instances.
+
+        :param vm_ids: The list of VM instance identifiers.
+        :type vm_ids: str
+
+        :Remark: This is a "wet method", termination will not be attempted
+            if the instance is in debug mode (``dry_run``).
+        """
+        cloud_handler.conn.terminate_instances(instance_ids=vm_ids)
+
+        rt = drett.ResourceTracker(url=cloud_handler.drett_config['url'])
+        for instance_id in vm_ids:
+            rt.resource_freed_by_attributes(resource_owner=self.name,
+                                            resource_type=self.resource_type,
+                                            resource_id=instance_id)
+
+
+    def perform(self, cloud_handler):
+        """
+        Terminate a VM instance.
+
+        :param instance_data: Information necessary to access the VM instance.
+        :type instance_data: :ref:`Instance Data <instancedata>`
+        """
+        instance_id = self.instance_data['instance_id']
+        log.debug("[%s] Dropping node %r", cloud_handler.name,
+                  self.instance_data['node_id'])
+
+        self._delete_vms(cloud_handler, instance_id)
+
+        log.debug("[%s] Done", cloud_handler.name)
+
+class GetState(Command):
+    def __init__(self, instance_data):
+        Command.__init__(self)
+        self.instance_data = instance_data
+    
+    @wet_method('running')
+    def perform(self, cloud_handler):
+        inst = get_instance(cloud_handler.conn, self.instance_data['instance_id'])
+        retval = inst.state
+        if retval=="pending":
+            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
+                      retval, status.PENDING)
+            return status.PENDING
+        elif retval=="running":
+            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
+                      retval, status.READY)
+            return status.READY
+        elif retval=="shutting-down" or retval=="terminated":
+            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
+                      retval, status.SHUTDOWN)
+            return status.SHUTDOWN
+        elif retval=="stopping" or retval=="stopped":
+            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
+                      retval, status.TMP_FAIL)
+            return status.TMP_FAIL
+        else:
+            raise NotImplementedError()
+
+class GetIpAddress(Command):
+    def __init__(self, instance_data):
+        Command.__init__(self)
+        self.instance_data = instance_data
+    
+    @wet_method('127.0.0.1')
+    def perform(self, cloud_handler):
+        inst = get_instance(cloud_handler.conn, self.instance_data['instance_id'])
+        return coalesce(inst.ip_address, inst.private_ip_address)
+
+class GetAddress(Command):
+    def __init__(self, instance_data):
+        Command.__init__(self)
+        self.instance_data = instance_data
+    
+    @wet_method('127.0.0.1')
+    def get_address(self, cloud_handler):
+        inst = get_instance(cloud_handler.conn, self.instance_data['instance_id'])
+        return coalesce(inst.public_dns_name,
+                        inst.ip_address,
+                        inst.private_ip_address)
 
 @factory.register(CloudHandler, PROTOCOL_ID)
 class BotoCloudHandler(CloudHandler):
@@ -90,112 +223,6 @@ class BotoCloudHandler(CloudHandler):
         # but maybe it'll change in the future.
         self.resource_type = 'vm'
 
-    @wet_method(1)
-    def _start_instance(self, image_id, instance_type, context):
-        """
-        Start the VM instance.
-
-        :param str image_id: The image identifier in the backend cloud.
-        :param str instance_type: The instance type as specified by the
-            backend cloud (e.g. m1.small).
-        :param str context: Contextualization for the VM instane.
-
-        :Remark: This is a "wet method", the VM will not be started
-            if the instance is in debug mode (``dry_run``).
-        """
-        with drett.Allocation(resource_owner=self.name,
-                              resource_type=self.resource_type,
-                              **self.drett_config) as a:
-            reservation = self.conn.run_instances(image_id=image_id,
-                                                  instance_type=instance_type,
-                                                  user_data=context)
-            vm_id = reservation.instances[0].id
-            a.set_resource_data(vm_id)
-        return vm_id
-
-    @wet_method()
-    def _delete_vms(self, *vm_ids):
-        """
-        Terminate VM instances.
-
-        :param vm_ids: The list of VM instance identifiers.
-        :type vm_ids: str
-
-        :Remark: This is a "wet method", termination will not be attempted
-            if the instance is in debug mode (``dry_run``).
-        """
-        self.conn.terminate_instances(instance_ids=vm_ids)
-
-        rt = drett.ResourceTracker(url=self.drett_config['url'])
-        for instance_id in vm_ids:
-            rt.resource_freed_by_attributes(resource_owner=self.name,
-                                            resource_type=self.resource_type,
-                                            resource_id=instance_id)
-
-    def create_node(self, resolved_node_definition):
-        """
-        Crete node based on its
-        :ref:`definition <resolved-node-definition>`.
-        """
-        log.debug("[%s] Creating node: %r",
-                  self.name, resolved_node_definition['name'])
-        image_id = resolved_node_definition['image_id']
-        instance_type = resolved_node_definition['instance_type']
-        context = resolved_node_definition['context']
-
-        vm_id = self._start_instance(image_id, instance_type, context)
-
-        log.debug("[%s] Done; vm_id = %r", self.name, vm_id)
-        return vm_id
-
-    def drop_node(self, instance_data):
-        """
-        Terminate a VM instance.
-
-        :param instance_data: Information necessary to access the VM instance.
-        :type instance_data: :ref:`Instance Data <instancedata>`
-        """
-        instance_id = instance_data['instance_id']
-        log.debug("[%s] Dropping node %r", self.name, instance_data['node_id'])
-
-        self._delete_vms(instance_id)
-
-        log.debug("[%s] Done", self.name)
-
-    @wet_method('running')
-    def get_state(self, instance_data):
-        inst = get_instance(self.conn, instance_data['instance_id'])
-        retval = inst.state
-        if retval=="pending":
-            log.debug("[%s] Done; retval=%r; status=%r",self.name,
-                      retval, status.PENDING)
-            return status.PENDING
-        elif retval=="running":
-            log.debug("[%s] Done; retval=%r; status=%r",self.name,
-                      retval, status.READY)
-            return status.READY
-        elif retval=="shutting-down" or retval=="terminated":
-            log.debug("[%s] Done; retval=%r; status=%r",self.name,
-                      retval, status.SHUTDOWN)
-            return status.SHUTDOWN
-        elif retval=="stopping" or retval=="stopped":
-            log.debug("[%s] Done; retval=%r; status=%r",self.name,
-                      retval, status.TMP_FAIL)
-            return status.TMP_FAIL
-        else:
-            raise NotImplementedError()
-
-    @wet_method('127.0.0.1')
-    def get_ip_address(self, instance_data):
-        inst = get_instance(self.conn, instance_data['instance_id'])
-        return coalesce(inst.ip_address, inst.private_ip_address)
-
-    @wet_method('127.0.0.1')
-    def get_address(self, instance_data):
-        inst = get_instance(self.conn, instance_data['instance_id'])
-        return coalesce(inst.public_dns_name,
-                        inst.ip_address,
-                        inst.private_ip_address)
 
 #@factory.register(CloudHandlerProvider, 'boto')
 #class BotoCloudHandlerProvider(CloudHandlerProvider):
