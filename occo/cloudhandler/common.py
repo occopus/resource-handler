@@ -20,7 +20,7 @@ log = logging.getLogger('occo.cloudhandler')
 
 class Command(object):
     def __init__(self):
-   
+        pass   
     def perform(self, cloud_handler):
         """Perform the algorithm represented by this command."""
         raise NotImplementedError()

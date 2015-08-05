@@ -179,7 +179,7 @@ class GetAddress(Command):
         self.instance_data = instance_data
     
     @wet_method('127.0.0.1')
-    def get_address(self, cloud_handler):
+    def perform(self, cloud_handler):
         inst = get_instance(cloud_handler.conn, self.instance_data['instance_id'])
         return coalesce(inst.public_dns_name,
                         inst.ip_address,
