@@ -223,6 +223,23 @@ class BotoCloudHandler(CloudHandler):
         # but maybe it'll change in the future.
         self.resource_type = 'vm'
 
+    def cri_create_node(self, resolved_node_definition):
+        return CreateNode(resolved_node_definition)
+
+    def cri_drop_node(self, instance_data):
+        return DropNode(instance_data)
+
+    def cri_get_state(self, instance_data):
+        return GetState(instance_data)
+    
+    def cri_get_address(self, instance_data):
+        return GetAddress(instance_data)
+    
+    def cri_get_ip_address(self, instance_data):
+        return GetIpAddress(instance_data)
+
+    def perform(self, instruction):
+        instruction.perform(self)
 
 #@factory.register(CloudHandlerProvider, 'boto')
 #class BotoCloudHandlerProvider(CloudHandlerProvider):

@@ -47,7 +47,7 @@ class CloudHandler(factory.MultiBackend):
         self.__dict__.update(config)
 
     def perform(self, instruction):
-        instruction.perform(self)
+        raise NotImplementedError()
 
     def cri_create_node(self, resolved_node_definition):
         """ Instantiate a node.
@@ -68,10 +68,10 @@ class CloudHandler(factory.MultiBackend):
     def cri_get_state(self, instance_data):
         raise NotImplementedError()
 
-    def cri_get_adress(self, instance_data):
+    def cri_get_address(self, instance_data):
         raise NotImplementedError()
 
-    def cri_get_ip_adress(self, instance_data):
+    def cri_get_ip_address(self, instance_data):
         raise NotImplementedError()
 
 @ib.provider
