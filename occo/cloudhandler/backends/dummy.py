@@ -49,7 +49,9 @@ class CreateNode(Command):
             running=False)
 
         cloud_handler.kvstore[uid] = node_instance
-        cloud_handler.start_node(uid)
+        node_data = cloud_handler.kvstore[uid]
+        node_data['running'] = True
+        cloud_handler.kvstore[uid] = node_data
         log.debug("[CH] Done; Created node %r", uid)
         return uid
 
@@ -96,16 +98,6 @@ class GetAddress(Command):
     def perform(self, cloud_handler):
         return '127.0.0.1'
 
-class StartNode(Command):
-    def __init__(self, node_id):
-        Command.__init__(self)
-        self.node_id = node_id
-
-    def perform(self, cloud_handler):
-        node_data = cloud_handler.kvstore[node_id]
-        node_data['running'] = True
-        cloud_handler.kvstore[node_id] = node_data
-
 class DummyCloudHandler(CloudHandler):
     """ Dummy implementation of the
     :class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
@@ -138,9 +130,6 @@ class DummyCloudHandler(CloudHandler):
 
     def cri_get_ip_address(self, instance_data):
         return GetIpAddress(instance_data)
-
-    def cri_start_node(self, node_id):
-        return StartNode(node_id)
 
     def perform(self, instruction):
         instruction.perform(self)
