@@ -10,7 +10,7 @@ import occo.infraprocessor.infraprocessor as ip
 import occo.infraprocessor.synchronization.primitives as sp
 import occo.servicecomposer.servicecomposer as sc
 import occo.infobroker as ib
-import occo.infobroker.cloud_provider as cp
+import occo.infobroker.dynamic_state_provider as dsp 
 from occo.infobroker.uds import UDS
 import occo.util as util
 import uuid
@@ -54,7 +54,7 @@ class BotoTest(unittest.TestCase):
         mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
             self.uds,
             self.sc,
-            cp.CloudInfoProvider(self.sc, self.ch),
+            dsp.DynamicStateProvider(self.sc, self.ch),
             sp.SynchronizationProvider(),
             bt.BotoCloudHandlerProvider(**self.cfg)
         ])
@@ -90,7 +90,7 @@ class BotoTest(unittest.TestCase):
         mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
             self.uds,
             self.sc,
-            cp.CloudInfoProvider(self.sc, self.ch),
+            dsp.DynamicStateProvider(self.sc, self.ch),
             sp.SynchronizationProvider(),
             bt.BotoCloudHandlerProvider(**self.cfg)
         ])
@@ -144,7 +144,7 @@ class BotoTest(unittest.TestCase):
         mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
             self.uds,
             self.sc,
-            cp.CloudInfoProvider(self.sc, self.ch),
+            dsp.DynamicStateProvider(self.sc, self.ch),
             sp.SynchronizationProvider(),
             bt.BotoCloudHandlerProvider(**self.cfg)
         ])
