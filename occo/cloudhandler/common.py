@@ -81,7 +81,8 @@ class CloudHandler(factory.MultiBackend):
     @classmethod
     def instantiate(cls, instance_data, *args, **kwargs):
         protocol = cls._chmapping[instance_data['backend_id']]
-        MultiBackend.instantiate(cls, protocol, *args, **kwargs)
+        super(CloudHandler, cls).instantiate(cls, protocol,
+                                             *args, **kwargs)
         
 @ib.provider
 class CloudHandlerProvider(b.InfoProvider):
