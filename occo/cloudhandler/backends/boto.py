@@ -58,7 +58,7 @@ def get_instance(conn, instance_id):
 class CreateNode(Command):
     def __init__(self, resolved_node_definition):
         Command.__init__(self)
-        self.resolved_node_definition = resolved_node_definiton
+        self.resolved_node_definition = resolved_node_definition
 
     @wet_method(1)
     def _start_instance(self, cloud_handler, image_id, instance_type, context):
