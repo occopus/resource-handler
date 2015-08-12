@@ -80,9 +80,9 @@ class CloudHandler(factory.MultiBackend):
         return ch.cri_create_node(resolved_node_definition).perform(ch)
 
     def drop_node(self, instance_data):
-        cfg = self.cloud_cfgs[nstance_data['backend_id']]
+        cfg = self.cloud_cfgs[instance_data['backend_id']]
         ch = CloudHandler.instantiate(**cfg)
-        return ch.cri_drop_node(nstance_data).perform(ch)
+        return ch.cri_drop_node(instance_data).perform(ch)
 
     def get_state(self, instance_data):
         cfg = self.cloud_cfgs[instance_data['backend_id']]
