@@ -4,6 +4,7 @@ import unittest
 from nose.tools import ok_, eq_
 import common
 import occo.cloudhandler.backends.boto as bt
+import occo.cloudhandler.backends.dummy
 from occo.cloudhandler.common import CloudHandler, CloudHandlerProvider
 import occo.infraprocessor.basic_infraprocessor
 import occo.infraprocessor.infraprocessor as ip

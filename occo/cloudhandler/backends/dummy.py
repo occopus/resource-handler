@@ -98,6 +98,7 @@ class GetAddress(Command):
     def perform(self, cloud_handler):
         return '127.0.0.1'
 
+@factory.register(CloudHandler, 'dummy')
 class DummyCloudHandler(CloudHandler):
     """ Dummy implementation of the
     :class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
