@@ -43,8 +43,8 @@ class CloudHandler(factory.MultiBackend):
           three methods, we can simply proxy each of them individually.)
 
     """
-    def __init__(self, **config):
-        self.__dict__.update(config)
+    def __init__(self, cloud_cfgs):
+        self.cloud_cfgs = cloud_cfgs
 
     def perform(self, instruction):
         raise NotImplementedError()
@@ -74,6 +74,31 @@ class CloudHandler(factory.MultiBackend):
     def cri_get_ip_address(self, instance_data):
         raise NotImplementedError()
 
+    def create_node(self, resolved_node_definition):
+        cfg = self.cloud_cfgs[resolved_node_definition['backend_id']]
+        ch = CloudHandler.instantiate(**cfg)
+        return ch.cri_create_node(resolved_node_definition).perform(ch)
+
+    def drop_node(self, instance_data):
+        cfg = self.cloud_cfgs[nstance_data['backend_id']]
+        ch = CloudHandler.instantiate(**cfg)
+        return ch.cri_drop_node(nstance_data).perform(ch)
+
+    def get_state(self, instance_data):
+        cfg = self.cloud_cfgs[instance_data['backend_id']]
+        ch = CloudHandler.instantiate(**cfg)
+        return ch.cri_get_state(instance_data).perform(ch)
+
+    def get_address(self, instance_data):
+        cfg = self.cloud_cfgs[instance_data['backend_id']]
+        ch = CloudHandler.instantiate(**cfg)
+        return ch.cri_get_address(instance_data).perform(ch)
+
+    def get_ip_address(self, instance_data):
+        cfg = self.cloud_cfgs[instance_data['backend_id']]
+        ch = CloudHandler.instantiate(**cfg)
+        return ch.cri_get_ip_address(instance_data).perform(ch)
+        
 @ib.provider
 class CloudHandlerProvider(ib.InfoProvider):
     def __init__(self, cloud_handler, **config):
