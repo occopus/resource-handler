@@ -16,7 +16,7 @@ import occo.util as util
 import uuid
 import yaml
 import logging
-import os
+import os, sys
 
 log = logging.getLogger('occo_test.boto_test')
 
@@ -159,4 +159,4 @@ class BotoTest(unittest.TestCase):
                 log.exception('Failure:')
                 last_exception = ex
         if last_exception:
-            raise last_exception
+            raise last_exception, None, sys.exc_info()[2]
