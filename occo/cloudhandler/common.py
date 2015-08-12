@@ -85,7 +85,7 @@ class CloudHandler(factory.MultiBackend):
                                              *args, **kwargs)
         
 @ib.provider
-class CloudHandlerProvider(b.InfoProvider):
+class CloudHandlerProvider(ib.InfoProvider):
     def __init__(self, cloud_handler, **config):
         self.__dict__.update(config)
         self.cloud_handler = cloud_handler
