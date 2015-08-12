@@ -74,16 +74,6 @@ class CloudHandler(factory.MultiBackend):
     def cri_get_ip_address(self, instance_data):
         raise NotImplementedError()
 
-    @classmethod
-    def setup_factory(cls, chmapping):
-        cls._chmapping = chmapping
-
-    @classmethod
-    def instantiate(cls, instance_data, *args, **kwargs):
-        protocol = cls._chmapping[instance_data['backend_id']]
-        super(CloudHandler, cls).instantiate(cls, protocol,
-                                             *args, **kwargs)
-        
 @ib.provider
 class CloudHandlerProvider(ib.InfoProvider):
     def __init__(self, cloud_handler, **config):
