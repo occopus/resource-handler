@@ -14,8 +14,8 @@ ctl_mqconfig: &CTL_MQCFG
     <<: *MQCFG
     queue: remote_infobroker_test_ctl
     routing_key: remote_infobroker_test_ctl
-clouds:
-    dummy_cloud_instance0: !CloudHandler
+ch_cfgs:
+    dummy: 
         protocol: dummy
         target:
             url: https://example.org/
@@ -26,7 +26,7 @@ clouds:
             init_dict:
                 test: 1
                 testt: 2
-    boto_lpds_cloud_instance:
+    lpds:
         protocol: boto
         name: LPDS-Cloud
         dry_run: true
@@ -46,5 +46,15 @@ node_defs:
         instance_type: m1.small
         context: ''
         name: node1
+
+    node_lpds:
+        implementation_type: cooked
+        backend_id: lpds
+        servicecomposer_id: dummy
+        image_id: ami-00001082 # Ubuntu 14.04 cloud-init
+        instance_type: m1.small
+        context: ''
+        name: node_lpds
+
 logging: !yaml_import
     url: file://logging.yaml

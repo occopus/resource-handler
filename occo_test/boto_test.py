@@ -4,7 +4,7 @@ import unittest
 from nose.tools import ok_, eq_
 import common
 import occo.cloudhandler.backends.boto as bt
-from occo.cloudhandler.common import CloudHandler
+from occo.cloudhandler.common import CloudHandler, CloudHandlerProvider
 import occo.infraprocessor.basic_infraprocessor
 import occo.infraprocessor.infraprocessor as ip
 import occo.infraprocessor.synchronization.primitives as sp
@@ -35,28 +35,26 @@ class BotoTest(unittest.TestCase):
         else:
             self.drop_nodes = []
 
-        self.cfg = cfg.clouds['boto_lpds_cloud_instance']
+        self.cfg = cfg.ch_cfgs
         cleaner = util.Cleaner(hide_keys=['password'])
         log.debug(
             'Using Boto config:\n%s',
             yaml.dump(cleaner.deep_copy(self.cfg)))
 
-        self.node_def = cfg.node_defs['node1']
-
     def test_full_dryrun(self):
         self.cfg['dry_run'] = True
-        self.ch = CloudHandler.instantiate(**self.cfg)
-        nid = self.ch.create_node(self.node_def)
+        self.ch = CloudHandler(self.cfg)
+        nid = self.ch.create_node(cfg.node_defs['node1'])
 
         self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
         self.uds = UDS.instantiate(protocol='dict')
-        self.uds.kvstore.set_item('node_def:test', [self.node_def])
+##        self.uds.kvstore.set_item('node_def:test', [self.node_def])
         mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
             self.uds,
             self.sc,
             dsp.DynamicStateProvider(self.sc, self.ch),
             sp.SynchronizationProvider(),
-            bt.BotoCloudHandlerProvider(**self.cfg)
+            CloudHandlerProvider(self.ch)
         ])
 
         try:
@@ -73,26 +71,28 @@ class BotoTest(unittest.TestCase):
     @real_resource
     def test_create_node(self):
         self.cfg['dry_run'] = False
-        self.ch = CloudHandler.instantiate(**self.cfg)
-        log.debug("node_desc: %r", self.node_def)
-        nid = self.ch.create_node(self.node_def)
+        self.ch = CloudHandler(self.cfg)
+        node_def = cfg.node_defs['node_lpds']
+        log.debug("node_desc: %r", node_def)
+        nid = self.ch.create_node(node_def)
         log.debug("Resource acquired; node_id = %r", nid)
         self.drop_nodes.append(dict(instance_id=nid, node_id="test"))
         self.update_drop_nodes()
 
     @real_resource
     def test_create_using_ip(self):
+        node_def = cfg.node_defs['node_lpds']
         self.cfg['dry_run'] = False
-        self.ch = CloudHandler.instantiate(**self.cfg)
+        self.ch = CloudHandler(self.cfg)
         self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
         self.uds = UDS.instantiate(protocol='dict')
-        self.uds.kvstore.set_item('node_def:test', [self.node_def])
+        self.uds.kvstore.set_item('node_def:test', [node_def])
         mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
             self.uds,
             self.sc,
             dsp.DynamicStateProvider(self.sc, self.ch),
             sp.SynchronizationProvider(),
-            bt.BotoCloudHandlerProvider(**self.cfg)
+            CloudHandlerProvider(self.ch)
         ])
 
         eid = str(uuid.uuid4())
@@ -115,7 +115,7 @@ class BotoTest(unittest.TestCase):
     @real_resource
     def test_drop_node(self):
         self.cfg['dry_run'] = False
-        self.ch = CloudHandler.instantiate(**self.cfg)
+        self.ch = CloudHandler(self.cfg)
         remaining = []
         last_exception = None
         for i in self.drop_nodes:
@@ -135,18 +135,19 @@ class BotoTest(unittest.TestCase):
     @real_resource
     def test_node_status(self):
         self.cfg['dry_run'] = False
-        self.ch = CloudHandler.instantiate(**self.cfg)
+        self.ch = CloudHandler(self.cfg)
         last_exception = None
+##        node_def = cfg.node_defs['node1']
 
         self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
         self.uds = UDS.instantiate(protocol='dict')
-        self.uds.kvstore.set_item('node_def:test', [self.node_def])
+##        self.uds.kvstore.set_item('node_def:test', [node_def])
         mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
             self.uds,
             self.sc,
             dsp.DynamicStateProvider(self.sc, self.ch),
             sp.SynchronizationProvider(),
-            bt.BotoCloudHandlerProvider(**self.cfg)
+            CloudHandlerProvider(self.ch)
         ])
 
         for i in self.drop_nodes:
