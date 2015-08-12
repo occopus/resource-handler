@@ -76,7 +76,8 @@ class BotoTest(unittest.TestCase):
         log.debug("node_desc: %r", node_def)
         nid = self.ch.create_node(node_def)
         log.debug("Resource acquired; node_id = %r", nid)
-        self.drop_nodes.append(dict(instance_id=nid, node_id="test"))
+        self.drop_nodes.append(dict(instance_id=nid, node_id="test",
+                                    backend_id=node_def['backend_id']))
         self.update_drop_nodes()
 
     @real_resource
