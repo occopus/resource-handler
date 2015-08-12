@@ -31,7 +31,7 @@ log = logging.getLogger('occo.cloudhandler.backends.dummy')
 class CreateNode(Command):
     def __init__(self, resolved_node_definition):
         Command.__init__(self)
-        self.resolved_node_definition = resolved_node_definiton
+        self.resolved_node_definition = resolved_node_definition
 
     def perform(self, cloud_handler):
         log.debug("[CH] Creating node: %r", self.resolved_node_definition)
@@ -44,7 +44,7 @@ class CreateNode(Command):
         node_instance = dict(
             instance_id=uid,
             infra_id=self.resolved_node_definition['infra_id'],
-            node_id=self.resolved_node_definition['id'],
+            node_id=self.resolved_node_definition['node_id'],
             node_type=self.resolved_node_definition['name'],
             running=False)
 
@@ -115,7 +115,6 @@ class DummyCloudHandler(CloudHandler):
     def __init__(self, kvstore, **config):
         self.kvstore = kvstore
         self.delayed = config.get('delayed', False)
-        CloudHandlerProvider.__init__(self, **config)
 
     def cri_create_node(self, resolved_node_definition):
         return CreateNode(resolved_node_definition)

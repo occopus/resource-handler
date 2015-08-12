@@ -46,6 +46,8 @@ node_defs:
         instance_type: m1.small
         context: ''
         name: node1
+        infra_id: 1
+        node_id: 10
 
     node_lpds:
         implementation_type: cooked
@@ -55,6 +57,8 @@ node_defs:
         instance_type: m1.small
         context: ''
         name: node_lpds
+        infra_id: 2
+        node_id: 20
 
 logging: !yaml_import
     url: file://logging.yaml
