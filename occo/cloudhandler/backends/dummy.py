@@ -12,7 +12,7 @@ import occo.util as util
 import occo.util.config as config
 import occo.util.factory as factory
 from ..common import CloudHandler
-from ..common import CloudHandlerProvider
+from ..common import Command 
 import logging
 import time
 import random
@@ -24,8 +24,82 @@ __all__ = ['DummyCloudHandler']
 
 log = logging.getLogger('occo.cloudhandler.backends.dummy')
 
-@factory.register(CloudHandler, PROTOCOL_ID)
-class DummyCloudHandler(CloudHandler, CloudHandlerProvider):
+
+#############
+##CH Commands
+
+class CreateNode(Command):
+    def __init__(self, resolved_node_definition):
+        Command.__init__(self)
+        self.resolved_node_definition = resolved_node_definition
+
+    def perform(self, cloud_handler):
+        log.debug("[CH] Creating node: %r", self.resolved_node_definition)
+
+        if cloud_handler.delayed:
+            time.sleep(3 + max(-2, random.normalvariate(0, 0.5)))
+
+        uid = 'dummy_vm_{0}'.format(uuid.uuid4())
+
+        node_instance = dict(
+            instance_id=uid,
+            infra_id=self.resolved_node_definition['infra_id'],
+            node_id=self.resolved_node_definition['node_id'],
+            node_type=self.resolved_node_definition['name'],
+            running=False)
+
+        cloud_handler.kvstore[uid] = node_instance
+        node_data = cloud_handler.kvstore[uid]
+        node_data['running'] = True
+        cloud_handler.kvstore[uid] = node_data
+        log.debug("[CH] Done; Created node %r", uid)
+        return uid
+
+class DropNode(Command):
+    def __init__(self, instance_data):
+        Command.__init__(self)
+        self.instance_data = instance_data
+
+    def perform(self, cloud_handler):
+        node_id = self.instance_data['instance_id']
+        log.debug("[CH] Dropping node %r", node_id)
+        if cloud_handler.delayed:
+            time.sleep(2 + max(-2, random.normalvariate(0, 0.5)))
+        cloud_handler.kvstore[node_id] = None
+        log.debug("[CH] Done")
+
+class GetState(Command):
+    def __init__(self, instance_data):
+        Command.__init__(self)
+        self.instance_data = instance_data
+
+    def perform(self, cloud_handler):
+        node_id = self.instance_data['instance_id']
+        log.debug("[CH] Acquiring node state for %r", node_id)
+        n = cloud_handler.kvstore[node_id]
+        return \
+            'unknown' if not n \
+            else 'ready' if n['running'] \
+            else 'pending'
+
+class GetIpAddress(Command):
+    def __init__(self, instance_data):
+        Command.__init__(self)
+        self.instance_data = instance_data
+
+    def perform(self, cloud_handler):
+        return '127.0.0.1'
+
+class GetAddress(Command):
+    def __init__(self, instance_data):
+        Command.__init__(self)
+        self.instance_data = instance_data
+
+    def perform(self, cloud_handler):
+        return '127.0.0.1'
+
+@factory.register(CloudHandler, 'dummy')
+class DummyCloudHandler(CloudHandler):
     """ Dummy implementation of the
     :class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
 
@@ -41,46 +115,22 @@ class DummyCloudHandler(CloudHandler, CloudHandlerProvider):
     def __init__(self, kvstore, **config):
         self.kvstore = kvstore
         self.delayed = config.get('delayed', False)
-        CloudHandlerProvider.__init__(self, **config)
 
-    def create_node(self, resolved_node_definition):
-        log.debug("[CH] Creating node: %r", resolved_node_definition)
+    def cri_create_node(self, resolved_node_definition):
+        return CreateNode(resolved_node_definition)
 
-        if self.delayed:
-            time.sleep(3 + max(-2, random.normalvariate(0, 0.5)))
+    def cri_drop_node(self, instance_data):
+        return DropNode(instance_data)
 
-        uid = 'dummy_vm_{0}'.format(uuid.uuid4())
+    def cri_get_state(self, instance_data):
+        return GetState(instance_data)
 
-        node_instance = dict(
-            instance_id=uid,
-            infra_id=resolved_node_definition['infra_id'],
-            node_id=resolved_node_definition['id'],
-            node_type=resolved_node_definition['name'],
-            running=False)
+    def cri_get_address(self, instance_data):
+        return GetAddress(instance_data)
 
-        self.kvstore[uid] = node_instance
-        self.start_node(uid)
-        log.debug("[CH] Done; Created node %r", uid)
-        return uid
+    def cri_get_ip_address(self, instance_data):
+        return GetIpAddress(instance_data)
 
-    def start_node(self, node_id):
-        node_data = self.kvstore[node_id]
-        node_data['running'] = True
-        self.kvstore[node_id] = node_data
+    def perform(self, instruction):
+        instruction.perform(self)
 
-    def drop_node(self, instance_data):
-        node_id = instance_data['instance_id']
-        log.debug("[CH] Dropping node %r", node_id)
-        if self.delayed:
-            time.sleep(2 + max(-2, random.normalvariate(0, 0.5)))
-        self.kvstore[node_id] = None
-        log.debug("[CH] Done")
-
-    def get_state(self, instance_data):
-        node_id = instance_data['instance_id']
-        log.debug("[CH] Acquiring node state for %r", node_id)
-        n = self.kvstore[node_id]
-        return \
-            'unknown' if not n \
-            else 'ready' if n['running'] \
-            else 'pending'

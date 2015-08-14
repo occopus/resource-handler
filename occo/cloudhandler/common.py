@@ -14,8 +14,16 @@ import occo.infobroker as ib
 import occo.util.factory as factory
 import yaml
 import logging
+import time
 
 log = logging.getLogger('occo.cloudhandler')
+
+class Command(object):
+    def __init__(self):
+        pass   
+    def perform(self, cloud_handler):
+        """Perform the algorithm represented by this command."""
+        raise NotImplementedError()
 
 class CloudHandler(factory.MultiBackend):
     """
@@ -35,10 +43,13 @@ class CloudHandler(factory.MultiBackend):
           three methods, we can simply proxy each of them individually.)
 
     """
-    def __init__(self, **config):
-        self.__dict__.update(config)
+    def __init__(self, cloud_cfgs):
+        self.cloud_cfgs = cloud_cfgs
 
-    def create_node(self, resolved_node_definition):
+    def perform(self, instruction):
+        raise NotImplementedError()
+
+    def cri_create_node(self, resolved_node_definition):
         """ Instantiate a node.
 
         :param resolved_node_definition: Information required to instantiate
@@ -46,7 +57,7 @@ class CloudHandler(factory.MultiBackend):
         """
         raise NotImplementedError()
 
-    def drop_node(self, instance_data):
+    def cri_drop_node(self, instance_data):
         """ Destroy a node instance.
 
         :param instance_data: Information required to destroy a node instance.
@@ -54,26 +65,54 @@ class CloudHandler(factory.MultiBackend):
         """
         raise NotImplementedError()
 
+    def cri_get_state(self, instance_data):
+        raise NotImplementedError()
+
+    def cri_get_address(self, instance_data):
+        raise NotImplementedError()
+
+    def cri_get_ip_address(self, instance_data):
+        raise NotImplementedError()
+
+    def instantiate_ch(self, data):
+        cfg = self.cloud_cfgs[data['backend_id']]
+        return CloudHandler.instantiate(**cfg)
+
+    def create_node(self, resolved_node_definition):
+        ch = self.instantiate_ch(resolved_node_definition)
+        return ch.cri_create_node(resolved_node_definition).perform(ch)
+
+    def drop_node(self, instance_data):
+        ch = self.instantiate_ch(instance_data)
+        return ch.cri_drop_node(instance_data).perform(ch)
+
+    def get_state(self, instance_data):
+        ch = self.instantiate_ch(instance_data)
+        return ch.cri_get_state(instance_data).perform(ch)
+
+    def get_address(self, instance_data):
+        ch = self.instantiate_ch(instance_data)
+        return ch.cri_get_address(instance_data).perform(ch)
+
+    def get_ip_address(self, instance_data):
+        ch = self.instantiate_ch(instance_data)
+        return ch.cri_get_ip_address(instance_data).perform(ch)
+        
 @ib.provider
-class CloudHandlerProvider(factory.MultiBackend, ib.InfoProvider):
-    def __init__(self, **config):
+class CloudHandlerProvider(ib.InfoProvider):
+    def __init__(self, cloud_handler, **config):
         self.__dict__.update(config)
+        self.cloud_handler = cloud_handler
 
     @ib.provides('node.resource.state')
     def get_state(self, instance_data):
-        return self._get_state(instance_data)
+        return self.cloud_handler.get_state(instance_data)
 
     @ib.provides('node.resource.ip_address')
     def get_ip_address(self, instance_data):
-        return self._get_ip_address(instance_data)
+        return self.cloud_handler.get_ip_address(instance_data)
 
     @ib.provides('node.resource.address')
     def get_address(self, instance_data):
-        return self._get_address(instance_data)
+        return self.cloud_handler.get_address(instance_data)
 
-    def _get_state(self, instance_data):
-        raise NotImplementedError()
-    def _get_address(self, instance_data):
-        raise NotImplementedError()
-    def _get_ip_address(self, instance_data):
-        raise NotImplementedError()
