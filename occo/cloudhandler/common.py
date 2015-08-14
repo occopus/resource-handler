@@ -74,29 +74,28 @@ class CloudHandler(factory.MultiBackend):
     def cri_get_ip_address(self, instance_data):
         raise NotImplementedError()
 
+    def instantiate_ch(self, data):
+        cfg = self.cloud_cfgs[data['backend_id']]
+        return CloudHandler.instantiate(**cfg)
+
     def create_node(self, resolved_node_definition):
-        cfg = self.cloud_cfgs[resolved_node_definition['backend_id']]
-        ch = CloudHandler.instantiate(**cfg)
+        ch = self.instantiate_ch(resolved_node_definition)
         return ch.cri_create_node(resolved_node_definition).perform(ch)
 
     def drop_node(self, instance_data):
-        cfg = self.cloud_cfgs[instance_data['backend_id']]
-        ch = CloudHandler.instantiate(**cfg)
+        ch = self.instantiate_ch(instance_data)
         return ch.cri_drop_node(instance_data).perform(ch)
 
     def get_state(self, instance_data):
-        cfg = self.cloud_cfgs[instance_data['backend_id']]
-        ch = CloudHandler.instantiate(**cfg)
+        ch = self.instantiate_ch(instance_data)
         return ch.cri_get_state(instance_data).perform(ch)
 
     def get_address(self, instance_data):
-        cfg = self.cloud_cfgs[instance_data['backend_id']]
-        ch = CloudHandler.instantiate(**cfg)
+        ch = self.instantiate_ch(instance_data)
         return ch.cri_get_address(instance_data).perform(ch)
 
     def get_ip_address(self, instance_data):
-        cfg = self.cloud_cfgs[instance_data['backend_id']]
-        ch = CloudHandler.instantiate(**cfg)
+        ch = self.instantiate_ch(instance_data)
         return ch.cri_get_ip_address(instance_data).perform(ch)
         
 @ib.provider
