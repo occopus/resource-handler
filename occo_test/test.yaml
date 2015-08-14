@@ -29,7 +29,6 @@ ch_cfgs:
     lpds:
         protocol: boto
         name: LPDS-Cloud
-        dry_run: true
         target:
             endpoint: http://cfe2.lpds.sztaki.hu:4567
             regionname: ROOT

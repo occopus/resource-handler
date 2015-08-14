@@ -44,25 +44,29 @@ class BotoTest(unittest.TestCase):
 
     def test_full_dryrun(self):
         self.ch = CloudHandler(self.cfg)
-        self.ch.dry_run = True
-        nid = self.ch.create_node(cfg.node_defs['node1'])
+        with util.global_dry_run():
+            nid = self.ch.create_node(cfg.node_defs['node1'])
 
-        self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
-        self.uds = UDS.instantiate(protocol='dict')
-##        self.uds.kvstore.set_item('node_def:test', [self.node_def])
-        mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
-            self.uds,
-            self.sc,
-            dsp.DynamicStateProvider(self.sc, self.ch),
-            sp.SynchronizationProvider(),
-            CloudHandlerProvider(self.ch)
-        ])
+            self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
+            self.uds = UDS.instantiate(protocol='dict')
+    ##        self.uds.kvstore.set_item('node_def:test', [self.node_def])
+            mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
+                self.uds,
+                self.sc,
+                dsp.DynamicStateProvider(self.sc, self.ch),
+                sp.SynchronizationProvider(),
+                CloudHandlerProvider(self.ch)
+            ])
 
-        try:
-            log.debug(mib.get('node.resource.state',dict(instance_id=nid,
-                                                         node_id="test")))
-        finally:
-            self.ch.drop_node(dict(instance_id=nid, node_id="test"))
+            try:
+                log.debug(mib.get('node.resource.state',
+                                  dict(instance_id=nid,
+                                       node_id="test",
+                                       backend_id='lpds')))
+            finally:
+                self.ch.drop_node(dict(instance_id=nid,
+                                       node_id="test",
+                                       backend_id='lpds'))
 
     def update_drop_nodes(self):
         with open(DROP_NODES_FILE, 'w') as f:
@@ -72,7 +76,6 @@ class BotoTest(unittest.TestCase):
     @real_resource
     def test_create_node(self):
         self.ch = CloudHandler(self.cfg)
-        self.ch.dry_run = False
         node_def = cfg.node_defs['node_lpds']
         log.debug("node_desc: %r", node_def)
         nid = self.ch.create_node(node_def)
@@ -85,7 +88,6 @@ class BotoTest(unittest.TestCase):
     def test_create_using_ip(self):
         node_def = cfg.node_defs['node_lpds']
         self.ch = CloudHandler(self.cfg)
-        self.ch.dry_run = False
         self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
         self.uds = UDS.instantiate(protocol='dict')
         self.uds.kvstore.set_item('node_def:test', [node_def])
@@ -117,7 +119,6 @@ class BotoTest(unittest.TestCase):
     @real_resource
     def test_drop_node(self):
         self.ch = CloudHandler(self.cfg)
-        self.ch.dry_run = False
         remaining = []
         last_exception = None
         for i in self.drop_nodes:
@@ -137,7 +138,6 @@ class BotoTest(unittest.TestCase):
     @real_resource
     def test_node_status(self):
         self.ch = CloudHandler(self.cfg)
-        self.ch.dry_run = False
         last_exception = None
 ##        node_def = cfg.node_defs['node1']
 
