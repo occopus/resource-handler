@@ -115,10 +115,10 @@ class DropNode(Command):
 
         rt = drett.ResourceTracker(url=cloud_handler.drett_config['url'])
         for instance_id in vm_ids:
-            rt.resource_freed_by_attributes(resource_owner=self.name,
-                                            resource_type=self.resource_type,
-                                            resource_id=instance_id)
-
+            rt.resource_freed_by_attributes(
+                resource_owner=cloud_handler.name,
+                resource_type=cloud_handler.resource_type,
+                resource_id=instance_id)
 
     def perform(self, cloud_handler):
         """
