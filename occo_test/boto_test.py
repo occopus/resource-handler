@@ -133,7 +133,7 @@ class BotoTest(unittest.TestCase):
         self.drop_nodes = remaining
         self.update_drop_nodes()
         if last_exception:
-            raise last_exception
+            raise last_exception, None, sys.exc_info()[2]
 
     @real_resource
     def test_node_status(self):
