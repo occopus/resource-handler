@@ -43,8 +43,8 @@ class BotoTest(unittest.TestCase):
             yaml.dump(cleaner.deep_copy(self.cfg)))
 
     def test_full_dryrun(self):
-        self.cfg['dry_run'] = True
         self.ch = CloudHandler(self.cfg)
+        self.ch.dry_run = True
         nid = self.ch.create_node(cfg.node_defs['node1'])
 
         self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
@@ -71,8 +71,8 @@ class BotoTest(unittest.TestCase):
 
     @real_resource
     def test_create_node(self):
-        self.cfg['dry_run'] = False
         self.ch = CloudHandler(self.cfg)
+        self.ch.dry_run = False
         node_def = cfg.node_defs['node_lpds']
         log.debug("node_desc: %r", node_def)
         nid = self.ch.create_node(node_def)
@@ -84,8 +84,8 @@ class BotoTest(unittest.TestCase):
     @real_resource
     def test_create_using_ip(self):
         node_def = cfg.node_defs['node_lpds']
-        self.cfg['dry_run'] = False
         self.ch = CloudHandler(self.cfg)
+        self.ch.dry_run = False
         self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
         self.uds = UDS.instantiate(protocol='dict')
         self.uds.kvstore.set_item('node_def:test', [node_def])
@@ -116,8 +116,8 @@ class BotoTest(unittest.TestCase):
 
     @real_resource
     def test_drop_node(self):
-        self.cfg['dry_run'] = False
         self.ch = CloudHandler(self.cfg)
+        self.ch.dry_run = False
         remaining = []
         last_exception = None
         for i in self.drop_nodes:
@@ -136,8 +136,8 @@ class BotoTest(unittest.TestCase):
 
     @real_resource
     def test_node_status(self):
-        self.cfg['dry_run'] = False
         self.ch = CloudHandler(self.cfg)
+        self.ch.dry_run = False
         last_exception = None
 ##        node_def = cfg.node_defs['node1']
 
