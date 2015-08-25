@@ -1,4 +1,4 @@
-skip_backend_tests: false
+skip_backend_tests: true
 drett_config: &DRETT_CONFIG
     url: http://c153-40.localcloud:5002/drett
     application: occo-test
