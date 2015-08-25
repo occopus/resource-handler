@@ -9,7 +9,7 @@ from occo.cloudhandler import CloudHandler, CloudHandlerProvider
 import occo.plugins.infraprocessor.basic_infraprocessor
 import occo.infraprocessor as ip
 import occo.infraprocessor.synchronization.primitives as sp
-import occo.servicecomposer.servicecomposer as sc
+import occo.servicecomposer as sc
 import occo.infobroker as ib
 import occo.infobroker.dynamic_state_provider as dsp 
 from occo.infobroker.uds import UDS
