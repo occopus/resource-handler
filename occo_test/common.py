@@ -4,7 +4,7 @@ import logging.config
 import occo.util as util
 import occo.util.config as config
 import occo.infobroker.kvstore
-import occo.cloudhandler.backends.dummy
+import occo.plugins.cloudhandler.dummy
 import yaml
 
 cfg = object()

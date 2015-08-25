@@ -11,8 +11,7 @@
 import occo.util as util
 import occo.util.config as config
 import occo.util.factory as factory
-from ..common import CloudHandler
-from ..common import Command 
+from occo.cloudhandler import CloudHandler, Command
 import logging
 import time
 import random
@@ -22,7 +21,7 @@ PROTOCOL_ID='dummy'
 
 __all__ = ['DummyCloudHandler']
 
-log = logging.getLogger('occo.cloudhandler.backends.dummy')
+log = logging.getLogger('occo.cloudhandler.dummy')
 
 
 #############

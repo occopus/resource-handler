@@ -3,7 +3,7 @@
 import unittest
 from nose.tools import ok_, eq_
 import common
-from occo.cloudhandler.common import CloudHandler
+from occo.cloudhandler import CloudHandler
 
 ##TODO: revise tests
 ##	- in test_drop_node s is a string - find viable solution

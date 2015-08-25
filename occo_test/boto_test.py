@@ -3,11 +3,11 @@
 import unittest
 from nose.tools import ok_, eq_
 import common
-import occo.cloudhandler.backends.boto as bt
-import occo.cloudhandler.backends.dummy
-from occo.cloudhandler.common import CloudHandler, CloudHandlerProvider
-import occo.infraprocessor.basic_infraprocessor
-import occo.infraprocessor.infraprocessor as ip
+import occo.plugins.cloudhandler.boto
+import occo.plugins.cloudhandler.dummy
+from occo.cloudhandler import CloudHandler, CloudHandlerProvider
+import occo.plugins.infraprocessor.basic_infraprocessor
+import occo.infraprocessor as ip
 import occo.infraprocessor.synchronization.primitives as sp
 import occo.servicecomposer.servicecomposer as sc
 import occo.infobroker as ib
