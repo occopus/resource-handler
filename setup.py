@@ -8,13 +8,18 @@ setuptools.setup(
     version='0.1.0',
     author='Adam Visegradi',
     author_email='adam.visegradi@sztaki.mta.hu',
-    namespace_packages=['occo',
-                        'occo.cloudhandler',
-                        'occo.cloudhandler.backends'],
-    py_modules=['occo.cloudhandler.common',
-                'occo.cloudhandler.backends.dummy',
-                'occo.cloudhandler.backends.boto'],
-    packages=setuptools.find_packages(),
+    namespace_packages=[
+        'occo',
+        'occo.plugins',
+        'occo.plugins.cloudhandler',
+    ],
+    py_modules=[
+        'occo.plugins.cloudhandler.dummy',
+        'occo.plugins.cloudhandler.boto'
+    ],
+    packages=[
+        'occo.cloudhandler',
+    ],
     scripts=[],
     url='http://www.lpds.sztaki.hu/',
     license='LICENSE.txt',
