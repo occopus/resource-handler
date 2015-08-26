@@ -13,23 +13,20 @@
 from __future__ import absolute_import
 import boto
 import boto.ec2
-
 import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce
-from ..common import CloudHandler, Command
+from occo.cloudhandler import CloudHandler, Command
 import itertools as it
 import logging
-
 import drett.client as drett
-
 import occo.constants.status as status
 
 __all__ = ['BotoCloudHandler']
 
 PROTOCOL_ID='boto'
 
-log = logging.getLogger('occo.cloudhandler.backends.boto')
+log = logging.getLogger('occo.cloudhandler.boto')
 
 def setup_connection(target, auth_data):
     """
