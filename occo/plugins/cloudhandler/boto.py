@@ -36,6 +36,8 @@ def setup_connection(target, auth_data):
     url = urlparse.urlparse(endpoint)
     region = boto.ec2.regioninfo.RegionInfo(
         name=target['regionname'], endpoint=url.hostname)
+    log.debug('Connecting to %r %r as %r',
+              endpoint, region, auth_data['username'])
     return boto.connect_ec2(
         aws_access_key_id=auth_data['username'],
         aws_secret_access_key=auth_data['password'],
@@ -46,7 +48,7 @@ def setup_connection(target, auth_data):
 
 def get_instance(conn, instance_id):
     reservations = conn.get_all_reservations(instance_ids=[instance_id])
-    # TODO: ASSUMING len(reservations)==1 and len(instances)==1
+    # ASSUMING len(reservations)==1 and len(instances)==1
     return reservations[0].instances[0]
 
 ##############
@@ -139,7 +141,11 @@ class GetState(Command):
     
     @wet_method('running')
     def perform(self, cloud_handler):
-        inst = get_instance(cloud_handler.conn, self.instance_data['instance_id'])
+        log.debug("[%s] Acquiring node state %r",
+                  cloud_handler.name,
+                  self.instance_data['node_id'])
+        inst = get_instance(cloud_handler.conn,
+                            self.instance_data['instance_id'])
         retval = inst.state
         if retval=="pending":
             log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
@@ -167,6 +173,9 @@ class GetIpAddress(Command):
     
     @wet_method('127.0.0.1')
     def perform(self, cloud_handler):
+        log.debug("[%s] Acquiring IP address for %r",
+                  cloud_handler.name,
+                  self.instance_data['node_id'])
         inst = get_instance(cloud_handler.conn, self.instance_data['instance_id'])
         return coalesce(inst.ip_address, inst.private_ip_address)
 
@@ -177,6 +186,9 @@ class GetAddress(Command):
     
     @wet_method('127.0.0.1')
     def perform(self, cloud_handler):
+        log.debug("[%s] Acquiring address for %r",
+                  cloud_handler.name,
+                  self.instance_data['node_id'])
         inst = get_instance(cloud_handler.conn, self.instance_data['instance_id'])
         return coalesce(inst.public_dns_name,
                         inst.ip_address,
