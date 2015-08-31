@@ -14,6 +14,7 @@ setuptools.setup(
         'occo.plugins.cloudhandler',
     ],
     py_modules=[
+        'occo.plugins.cloudhandler.cloudbroker',
         'occo.plugins.cloudhandler.dummy',
         'occo.plugins.cloudhandler.boto'
     ],
@@ -33,5 +34,6 @@ setuptools.setup(
         'PyYAML',
         'OCCO-Util',
         'OCCO-InfoBroker',
+        'requests',
     ],
 )
