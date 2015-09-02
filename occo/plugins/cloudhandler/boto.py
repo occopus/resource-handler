@@ -24,7 +24,15 @@ import occo.constants.status as status
 
 __all__ = ['BotoCloudHandler']
 
-PROTOCOL_ID='boto'
+PROTOCOL_ID = 'boto'
+STATE_MAPPING = {
+    'pending'       : status.PENDING,
+    'running'       : status.READY,
+    'shutting-down' : status.SHUTDOWN,
+    'terminated'    : status.SHUTDOWN,
+    'stopping'      : status.TMP_FAIL,
+    'stopped'       : status.TMP_FAIL,
+}
 
 log = logging.getLogger('occo.cloudhandler.boto')
 
@@ -160,28 +168,17 @@ class GetState(Command):
     @needs_connection
     def perform(self, cloud_handler):
         log.debug("[%s] Acquiring node state %r",
-                  cloud_handler.name,
-                  self.instance_data['node_id'])
+                  cloud_handler.name, self.instance_data['node_id'])
         inst = get_instance(self.conn, self.instance_data['instance_id'])
-        retval = inst.state
-        if retval=="pending":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.PENDING)
-            return status.PENDING
-        elif retval=="running":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.READY)
-            return status.READY
-        elif retval=="shutting-down" or retval=="terminated":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.SHUTDOWN)
-            return status.SHUTDOWN
-        elif retval=="stopping" or retval=="stopped":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.TMP_FAIL)
-            return status.TMP_FAIL
+        inst_state = inst.state
+        try:
+            retval = STATE_MAPPING[inst_state]
+        except KeyError:
+            raise NotImplementedError('Unknown EC2 state', inst_state)
         else:
-            raise NotImplementedError()
+            log.debug("[%s] Done; boto_state=%r; status=%r",
+                      cloud_handler.name, inst_state, retval)
+            return retval
 
 class GetIpAddress(Command):
     def __init__(self, instance_data):
