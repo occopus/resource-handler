@@ -54,12 +54,28 @@ def get_instance(conn, instance_id):
 ##############
 ## CH Commands
 
+def needs_connection(f):
+    """
+    Sets up the conn member of the Command object upon calling this method.
+
+    If this decorator is specified *inside* (after) ``@wet_method``, the
+    connection will not be established upon dry run.
+    """
+    import functools
+    @functools.wraps(f)
+    def g(self, cloud_handler, *args, **kwargs):
+        self.conn = cloud_handler.get_connection()
+        return f(self, cloud_handler, *args, **kwargs)
+
+    return g
+
 class CreateNode(Command):
     def __init__(self, resolved_node_definition):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
 
     @wet_method(1)
+    @needs_connection
     def _start_instance(self, cloud_handler, image_id, instance_type, context):
         """
         Start the VM instance.
@@ -75,8 +91,9 @@ class CreateNode(Command):
         with drett.Allocation(resource_owner=cloud_handler.name,
                               resource_type=cloud_handler.resource_type,
                               **cloud_handler.drett_config) as a:
-            reservation = cloud_handler.get_connection().run_instances(
-                image_id=image_id, instance_type=instance_type, user_data=context)
+            reservation = self.conn.run_instances(image_id=image_id,
+                                                  instance_type=instance_type,
+                                                  user_data=context)
             vm_id = reservation.instances[0].id
             a.set_resource_data(vm_id)
         return vm_id
@@ -99,6 +116,7 @@ class DropNode(Command):
         self.instance_data = instance_data    
     
     @wet_method()
+    @needs_connection
     def _delete_vms(self, cloud_handler, *vm_ids):
         """
         Terminate VM instances.
@@ -109,7 +127,7 @@ class DropNode(Command):
         :Remark: This is a "wet method", termination will not be attempted
             if the instance is in debug mode (``dry_run``).
         """
-        cloud_handler.get_connection().terminate_instances(instance_ids=vm_ids)
+        self.conn.terminate_instances(instance_ids=vm_ids)
 
         rt = drett.ResourceTracker(url=cloud_handler.drett_config['url'])
         for instance_id in vm_ids:
@@ -139,12 +157,12 @@ class GetState(Command):
         self.instance_data = instance_data
     
     @wet_method('running')
+    @needs_connection
     def perform(self, cloud_handler):
         log.debug("[%s] Acquiring node state %r",
                   cloud_handler.name,
                   self.instance_data['node_id'])
-        inst = get_instance(cloud_handler.get_connection(),
-                            self.instance_data['instance_id'])
+        inst = get_instance(self.conn, self.instance_data['instance_id'])
         retval = inst.state
         if retval=="pending":
             log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
@@ -171,12 +189,12 @@ class GetIpAddress(Command):
         self.instance_data = instance_data
     
     @wet_method('127.0.0.1')
+    @needs_connection
     def perform(self, cloud_handler):
         log.debug("[%s] Acquiring IP address for %r",
                   cloud_handler.name,
                   self.instance_data['node_id'])
-        inst = get_instance(cloud_handler.get_connection(),
-                            self.instance_data['instance_id'])
+        inst = get_instance(self.conn, self.instance_data['instance_id'])
         return coalesce(inst.ip_address, inst.private_ip_address)
 
 class GetAddress(Command):
@@ -185,12 +203,12 @@ class GetAddress(Command):
         self.instance_data = instance_data
     
     @wet_method('127.0.0.1')
+    @needs_connection
     def perform(self, cloud_handler):
         log.debug("[%s] Acquiring address for %r",
                   cloud_handler.name,
                   self.instance_data['node_id'])
-        inst = get_instance(cloud_handler.get_connection(),
-                            self.instance_data['instance_id'])
+        inst = get_instance(self.conn, self.instance_data['instance_id'])
         return coalesce(inst.public_dns_name,
                         inst.ip_address,
                         inst.private_ip_address)
