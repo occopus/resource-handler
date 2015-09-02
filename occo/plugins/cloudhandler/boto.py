@@ -24,7 +24,15 @@ import occo.constants.status as status
 
 __all__ = ['BotoCloudHandler']
 
-PROTOCOL_ID='boto'
+PROTOCOL_ID = 'boto'
+STATE_MAPPING = {
+    'pending'       : status.PENDING,
+    'running'       : status.READY,
+    'shutting-down' : status.SHUTDOWN,
+    'terminated'    : status.SHUTDOWN,
+    'stopping'      : status.TMP_FAIL,
+    'stopped'       : status.TMP_FAIL,
+}
 
 log = logging.getLogger('occo.cloudhandler.boto')
 
@@ -54,12 +62,28 @@ def get_instance(conn, instance_id):
 ##############
 ## CH Commands
 
+def needs_connection(f):
+    """
+    Sets up the conn member of the Command object upon calling this method.
+
+    If this decorator is specified *inside* (after) ``@wet_method``, the
+    connection will not be established upon dry run.
+    """
+    import functools
+    @functools.wraps(f)
+    def g(self, cloud_handler, *args, **kwargs):
+        self.conn = cloud_handler.get_connection()
+        return f(self, cloud_handler, *args, **kwargs)
+
+    return g
+
 class CreateNode(Command):
     def __init__(self, resolved_node_definition):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
 
     @wet_method(1)
+    @needs_connection
     def _start_instance(self, cloud_handler, image_id, instance_type, context):
         """
         Start the VM instance.
@@ -75,7 +99,7 @@ class CreateNode(Command):
         with drett.Allocation(resource_owner=cloud_handler.name,
                               resource_type=cloud_handler.resource_type,
                               **cloud_handler.drett_config) as a:
-            reservation = cloud_handler.conn.run_instances(image_id=image_id,
+            reservation = self.conn.run_instances(image_id=image_id,
                                                   instance_type=instance_type,
                                                   user_data=context)
             vm_id = reservation.instances[0].id
@@ -100,6 +124,7 @@ class DropNode(Command):
         self.instance_data = instance_data    
     
     @wet_method()
+    @needs_connection
     def _delete_vms(self, cloud_handler, *vm_ids):
         """
         Terminate VM instances.
@@ -110,7 +135,7 @@ class DropNode(Command):
         :Remark: This is a "wet method", termination will not be attempted
             if the instance is in debug mode (``dry_run``).
         """
-        cloud_handler.conn.terminate_instances(instance_ids=vm_ids)
+        self.conn.terminate_instances(instance_ids=vm_ids)
 
         rt = drett.ResourceTracker(url=cloud_handler.drett_config['url'])
         for instance_id in vm_ids:
@@ -140,31 +165,20 @@ class GetState(Command):
         self.instance_data = instance_data
     
     @wet_method('running')
+    @needs_connection
     def perform(self, cloud_handler):
         log.debug("[%s] Acquiring node state %r",
-                  cloud_handler.name,
-                  self.instance_data['node_id'])
-        inst = get_instance(cloud_handler.conn,
-                            self.instance_data['instance_id'])
-        retval = inst.state
-        if retval=="pending":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.PENDING)
-            return status.PENDING
-        elif retval=="running":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.READY)
-            return status.READY
-        elif retval=="shutting-down" or retval=="terminated":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.SHUTDOWN)
-            return status.SHUTDOWN
-        elif retval=="stopping" or retval=="stopped":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.TMP_FAIL)
-            return status.TMP_FAIL
+                  cloud_handler.name, self.instance_data['node_id'])
+        inst = get_instance(self.conn, self.instance_data['instance_id'])
+        inst_state = inst.state
+        try:
+            retval = STATE_MAPPING[inst_state]
+        except KeyError:
+            raise NotImplementedError('Unknown EC2 state', inst_state)
         else:
-            raise NotImplementedError()
+            log.debug("[%s] Done; boto_state=%r; status=%r",
+                      cloud_handler.name, inst_state, retval)
+            return retval
 
 class GetIpAddress(Command):
     def __init__(self, instance_data):
@@ -172,11 +186,12 @@ class GetIpAddress(Command):
         self.instance_data = instance_data
     
     @wet_method('127.0.0.1')
+    @needs_connection
     def perform(self, cloud_handler):
         log.debug("[%s] Acquiring IP address for %r",
                   cloud_handler.name,
                   self.instance_data['node_id'])
-        inst = get_instance(cloud_handler.conn, self.instance_data['instance_id'])
+        inst = get_instance(self.conn, self.instance_data['instance_id'])
         return coalesce(inst.ip_address, inst.private_ip_address)
 
 class GetAddress(Command):
@@ -185,11 +200,12 @@ class GetAddress(Command):
         self.instance_data = instance_data
     
     @wet_method('127.0.0.1')
+    @needs_connection
     def perform(self, cloud_handler):
         log.debug("[%s] Acquiring address for %r",
                   cloud_handler.name,
                   self.instance_data['node_id'])
-        inst = get_instance(cloud_handler.conn, self.instance_data['instance_id'])
+        inst = get_instance(self.conn, self.instance_data['instance_id'])
         return coalesce(inst.public_dns_name,
                         inst.ip_address,
                         inst.private_ip_address)
@@ -226,11 +242,13 @@ class BotoCloudHandler(CloudHandler):
         self.dry_run = dry_run
         self.name = name if name else target['endpoint']
         self.drett_config = drett_config
-        self.conn = setup_connection(target, auth_data) \
-            if not dry_run else None
-        # The following is intentional. It is a constant yet,
-        # but maybe it'll change in the future.
+        self.target, self.auth_data = target, auth_data
+        # The following is intentional. It is a constant yet, but maybe it'll
+        # change in the future.
         self.resource_type = 'vm'
+
+    def get_connection(self):
+        return setup_connection(self.target, self.auth_data)
 
     def cri_create_node(self, resolved_node_definition):
         return CreateNode(resolved_node_definition)
