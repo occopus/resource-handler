@@ -75,9 +75,8 @@ class CreateNode(Command):
         with drett.Allocation(resource_owner=cloud_handler.name,
                               resource_type=cloud_handler.resource_type,
                               **cloud_handler.drett_config) as a:
-            reservation = cloud_handler.conn.run_instances(image_id=image_id,
-                                                  instance_type=instance_type,
-                                                  user_data=context)
+            reservation = cloud_handler.get_connection().run_instances(
+                image_id=image_id, instance_type=instance_type, user_data=context)
             vm_id = reservation.instances[0].id
             a.set_resource_data(vm_id)
         return vm_id
@@ -110,7 +109,7 @@ class DropNode(Command):
         :Remark: This is a "wet method", termination will not be attempted
             if the instance is in debug mode (``dry_run``).
         """
-        cloud_handler.conn.terminate_instances(instance_ids=vm_ids)
+        cloud_handler.get_connection().terminate_instances(instance_ids=vm_ids)
 
         rt = drett.ResourceTracker(url=cloud_handler.drett_config['url'])
         for instance_id in vm_ids:
@@ -144,7 +143,7 @@ class GetState(Command):
         log.debug("[%s] Acquiring node state %r",
                   cloud_handler.name,
                   self.instance_data['node_id'])
-        inst = get_instance(cloud_handler.conn,
+        inst = get_instance(cloud_handler.get_connection(),
                             self.instance_data['instance_id'])
         retval = inst.state
         if retval=="pending":
@@ -176,7 +175,8 @@ class GetIpAddress(Command):
         log.debug("[%s] Acquiring IP address for %r",
                   cloud_handler.name,
                   self.instance_data['node_id'])
-        inst = get_instance(cloud_handler.conn, self.instance_data['instance_id'])
+        inst = get_instance(cloud_handler.get_connection(),
+                            self.instance_data['instance_id'])
         return coalesce(inst.ip_address, inst.private_ip_address)
 
 class GetAddress(Command):
@@ -189,7 +189,8 @@ class GetAddress(Command):
         log.debug("[%s] Acquiring address for %r",
                   cloud_handler.name,
                   self.instance_data['node_id'])
-        inst = get_instance(cloud_handler.conn, self.instance_data['instance_id'])
+        inst = get_instance(cloud_handler.get_connection(),
+                            self.instance_data['instance_id'])
         return coalesce(inst.public_dns_name,
                         inst.ip_address,
                         inst.private_ip_address)
@@ -226,11 +227,13 @@ class BotoCloudHandler(CloudHandler):
         self.dry_run = dry_run
         self.name = name if name else target['endpoint']
         self.drett_config = drett_config
-        self.conn = setup_connection(target, auth_data) \
-            if not dry_run else None
-        # The following is intentional. It is a constant yet,
-        # but maybe it'll change in the future.
+        self.target, self.auth_data = target, auth_data
+        # The following is intentional. It is a constant yet, but maybe it'll
+        # change in the future.
         self.resource_type = 'vm'
+
+    def get_connection(self):
+        return setup_connection(self.target, self.auth_data)
 
     def cri_create_node(self, resolved_node_definition):
         return CreateNode(resolved_node_definition)
