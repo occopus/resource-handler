@@ -50,13 +50,14 @@ class BotoTest(unittest.TestCase):
             self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
             self.uds = UDS.instantiate(protocol='dict')
     ##        self.uds.kvstore.set_item('node_def:test', [self.node_def])
-            mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
-                self.uds,
-                self.sc,
-                dsp.DynamicStateProvider(self.sc, self.ch),
-                sp.SynchronizationProvider(),
-                CloudHandlerProvider(self.ch)
-            ])
+            mib = ib.real_main_info_broker = \
+                ib.InfoRouter(sub_providers=[
+                    self.uds,
+                    self.sc,
+                    dsp.DynamicStateProvider(self.sc, self.ch),
+                    sp.SynchronizationProvider(),
+                    CloudHandlerProvider(self.ch)
+                ])
 
             try:
                 log.debug(mib.get('node.resource.state',
