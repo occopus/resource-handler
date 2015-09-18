@@ -164,7 +164,7 @@ class GetState(Command):
         Command.__init__(self)
         self.instance_data = instance_data
     
-    @wet_method('running')
+    @wet_method('ready')
     @needs_connection
     def perform(self, cloud_handler):
         log.debug("[%s] Acquiring node state %r",
