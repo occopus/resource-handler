@@ -29,7 +29,6 @@ setuptools.setup(
     install_requires=[
         'argparse',
         'boto',
-        'drett-client',
         'python-dateutil',
         'PyYAML',
         'OCCO-Util',

@@ -6,7 +6,6 @@ boto==2.34.0
 cov-core==1.15.0
 coverage==3.7.1
 dateutils==0.6.6
-drett-client==0.1.0
 pika==0.9.14
 pymongo==2.8
 python-dateutil==2.2

@@ -19,7 +19,6 @@ from occo.util import wet_method, coalesce
 from occo.cloudhandler import CloudHandler, Command
 import itertools as it
 import logging
-import drett.client as drett
 import occo.constants.status as status
 
 __all__ = ['BotoCloudHandler']
@@ -96,14 +95,10 @@ class CreateNode(Command):
         :Remark: This is a "wet method", the VM will not be started
             if the instance is in debug mode (``dry_run``).
         """
-        with drett.Allocation(resource_owner=cloud_handler.name,
-                              resource_type=cloud_handler.resource_type,
-                              **cloud_handler.drett_config) as a:
-            reservation = self.conn.run_instances(image_id=image_id,
-                                                  instance_type=instance_type,
-                                                  user_data=context)
-            vm_id = reservation.instances[0].id
-            a.set_resource_data(vm_id)
+        reservation = self.conn.run_instances(image_id=image_id,
+                                              instance_type=instance_type,
+                                              user_data=context)
+        vm_id = reservation.instances[0].id
         return vm_id
 
     def perform(self, cloud_handler):
@@ -136,13 +131,6 @@ class DropNode(Command):
             if the instance is in debug mode (``dry_run``).
         """
         self.conn.terminate_instances(instance_ids=vm_ids)
-
-        rt = drett.ResourceTracker(url=cloud_handler.drett_config['url'])
-        for instance_id in vm_ids:
-            rt.resource_freed_by_attributes(
-                resource_owner=cloud_handler.name,
-                resource_type=cloud_handler.resource_type,
-                resource_id=instance_id)
 
     def perform(self, cloud_handler):
         """
@@ -226,22 +214,18 @@ class BotoCloudHandler(CloudHandler):
         * ``username``: The access key.
         * ``password``: The secret key.
 
-    :param dict drett_config: Configuration for the resource allocation
-        tracking service, drett_\ .
     :param str name: The name of this ``CloudHandler`` instance. If unset,
         ``target['endpoint']`` is used.
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
     .. _Boto: https://boto.readthedocs.org/en/latest/
     .. _EC2: http://aws.amazon.com/ec2/
-    .. _drett: https://github.com/avisegradi/drett
     """
-    def __init__(self, target, auth_data, drett_config,
+    def __init__(self, target, auth_data, 
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
         self.name = name if name else target['endpoint']
-        self.drett_config = drett_config
         self.target, self.auth_data = target, auth_data
         # The following is intentional. It is a constant yet, but maybe it'll
         # change in the future.
