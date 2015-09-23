@@ -22,10 +22,14 @@ PROTOCOL_ID = 'docker'
 
 log = logging.getLogger('occo.cloudhandler.dockerp')
 
+def getInstance(base_url, instance_id):
+    return docker.Client(base_url).inspect_container(container=instance_id)
+
 class CreateNode(Command):
     def __init__(self, resolved_node_definition):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
+        self.base_url = self.resolved_node_definition['attributes']['base_url']
         self.origin = self.resolved_node_definition['attributes']['origin']
         self.image = self.resolved_node_definition['attributes']['image']
         self.tag = self.resolved_node_definition['attributes']['tag']
@@ -159,9 +163,10 @@ class GetIpAddress(Command):
         """
         Return (IPv4) network address of the container.
         """
-        #inst = get_instance(ast.literal_eval(self.instance_data['instance_id'])['Id'])
-        #return coalesce(inst.ip_address, inst.private_ip_address)
-        return '127.0.0.1'
+        instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
+        base_url = self.instance_data['resolved_node_definition']['attributes']['base_url']
+        info = getInstance(base_url, instance_id)
+        return coalesce(info['NetworkSettings']['IPAddress'])
 
 class GetAddress(Command):
     def __init__(self, instance_data):
@@ -173,10 +178,10 @@ class GetAddress(Command):
         """
         Return network address of the container.
         """
-        #inst = get_instance(ast.literal_eval(self.instance_data['instance_id'])['Id'])
-        
-        #return coalesce(inst.ip_address)
-        return '127.0.0.1'
+        instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
+        base_url = self.instance_data['resolved_node_definition']['attributes']['base_url']
+        info = getInstance(base_url, instance_id)
+        return coalesce(info['NetworkSettings']['IPAddress'])
 
 @factory.register(CloudHandler, 'docker')
 class DockerCloudHandler(CloudHandler):
