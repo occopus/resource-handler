@@ -48,8 +48,7 @@ class CreateNode(Command):
             command=self.command,
             #environment=self.environment
         )
-        #print container
-        #print container.get('Id')
+
         cli.start(container.get('Id'))
         log.debug('Started container [%s]', container)
         return str(container)
@@ -106,14 +105,6 @@ class DropNode(Command):
         self._delete_container(cloud_handler, self.instance_id)
 
         log.debug("[%s] Done", cloud_handler.name)
-
-
-#class MyThread(threading.Thread):
-#    def __init__(self):
-#        threading.Thread.__init__(self, target=self.run)
-#
-#    def run(self):
-#        pass
 
 class GetState(Command):
     def __init__(self, instance_data):
