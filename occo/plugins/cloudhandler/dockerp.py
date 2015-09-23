@@ -5,7 +5,7 @@
 """ Docker implementation of the
 :class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
 
-.. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>
+.. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>, Sandor Acs <acs.sandor@sztaki.mta.hu>
 """
 
 import occo.util.factory as factory
@@ -128,28 +128,31 @@ class GetState(Command):
 
         See http://www.lpds.sztaki.hu/occo/datastructures.html#node-status
         """
-        #inst = get_instance(ast.literal_eval(self.instance_data['instance_id'])['Id'])
-        #retval = inst.state
-        retval = "running"
-        if retval=="pending":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.PENDING)
-            return status.PENDING
-        elif retval=="running":
+
+        instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
+        base_url = self.instance_data['resolved_node_definition']['attributes']['base_url']
+        info = getInstance(base_url, instance_id)
+
+        if info['State']['Running']:
             #log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
             #          retval, status.READY)
             log.debug("Done; retval=%r; status=%r",
-                      retval, status.READY)
-            
+                      'Running', status.READY)
             return status.READY
-        elif retval=="shutting-down" or retval=="terminated":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.SHUTDOWN)
-            return status.SHUTDOWN
-        elif retval=="stopping" or retval=="stopped":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.TMP_FAIL)
+
+        elif info['State']['StartedAt'] == info['State']['FinishedAt']:
+            log.debug("Done; retval=%r; status=%r",
+                      Pending, status.PENDING)
+
+        elif info['State']['ExitCode'] == '-1':
+            log.debug("Done; retval=%r; status=%r",
+                      Failed, status.TMP_FAIL)
             return status.TMP_FAIL
+
+        elif not info['State']['Running']:
+            log.debug("Done; retval=%r; status=%r",
+                      Finished, status.SHUTDOWN)
+            return status.SHUTDOWN
         else:
             raise NotImplementedError()
 
