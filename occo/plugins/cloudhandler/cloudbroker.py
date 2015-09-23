@@ -15,7 +15,6 @@ from occo.util import wet_method, coalesce
 from occo.cloudhandler import CloudHandler, Command
 import itertools as it
 import logging
-import drett.client as drett
 import occo.constants.status as status
 import requests, json, uuid
 import xml.dom.minidom
@@ -42,7 +41,7 @@ def get_instance(cloud_handler, jobid):
     stime = 1
     while attempt < 3:
         r = requests.get(cloud_handler.target + '/instances.xml',
-            auth=get_auth(cloud_handler.auth_data), params={'job_id': jobid})
+                auth=get_auth(cloud_handler.auth_data), params={'job_id': jobid})
         if (r.status_code != 200):
             return None
         DOMTree = xml.dom.minidom.parseString(r.text)
@@ -83,45 +82,41 @@ class CreateNode(Command):
         :Remark: This is a "wet method", the job will not be started
             if the instance is in debug mode (``dry_run``).
         """
-        with drett.Allocation(resource_owner=cloud_handler.name,
-                              resource_type=cloud_handler.resource_type,
-                              **cloud_handler.drett_config) as a:
-            jobxml = Element('job')
-            name = SubElement(jobxml, 'name')
-            name.text = str(uuid.uuid4())
-            sid = SubElement(jobxml, 'software-id')
-            sid.text = software_id
-            eid = SubElement(jobxml, 'executable-id')
-            eid.text = executable_id
-            resid = SubElement(jobxml, 'resource-id')
-            resid.text = resource_id
-            regid = SubElement(jobxml, 'region-id')
-            regid.text = region_id
-            itid = SubElement(jobxml, 'instance-type-id')
-            itid.text = instance_type_id
-            prtag = SubElement(jobxml, 'permanently-running')
-            prtag.text = 'true'
-            r = requests.post(cloud_handler.target + '/jobs.xml', tostring(jobxml),
+        jobxml = Element('job')
+        name = SubElement(jobxml, 'name')
+        name.text = str(uuid.uuid4())
+        sid = SubElement(jobxml, 'software-id')
+        sid.text = software_id
+        eid = SubElement(jobxml, 'executable-id')
+        eid.text = executable_id
+        resid = SubElement(jobxml, 'resource-id')
+        resid.text = resource_id
+        regid = SubElement(jobxml, 'region-id')
+        regid.text = region_id
+        itid = SubElement(jobxml, 'instance-type-id')
+        itid.text = instance_type_id
+        prtag = SubElement(jobxml, 'permanently-running')
+        prtag.text = 'true'
+        r = requests.post(cloud_handler.target + '/jobs.xml', tostring(jobxml),
                 auth=get_auth(cloud_handler.auth_data),
                 headers={'Content-Type': 'application/xml'})
-            if (r.status_code == 201):
-                DOMTree = xml.dom.minidom.parseString(r.text)
-                job = DOMTree.documentElement
-                jobid = job.getElementsByTagName('id')[0].childNodes[0].data
-                rsubmit = requests.put(cloud_handler.target + '/jobs/' +
+        if (r.status_code == 201):
+            DOMTree = xml.dom.minidom.parseString(r.text)
+            job = DOMTree.documentElement
+            jobid = job.getElementsByTagName('id')[0].childNodes[0].data
+            rsubmit = requests.put(cloud_handler.target + '/jobs/' +
                     jobid + '/submit.xml', auth=get_auth(cloud_handler.auth_data))
-                if (rsubmit.status_code != 200):
-                    rdelete = requests.delete(cloud_handler.target + '/jobs/' +
+            if (rsubmit.status_code != 200):
+                rdelete = requests.delete(cloud_handler.target + '/jobs/' +
                         jobid + '.xml', auth=get_auth(cloud_handler.auth_data))
-                    jobid = None
-            else:
                 jobid = None
-            a.set_resource_data(jobid)
+        else:
+            jobid = None
         return jobid
 
     def perform(self, cloud_handler):
         log.debug("[%s] Creating node: %r",
-                  cloud_handler.name, self.resolved_node_definition['name'])
+                cloud_handler.name, self.resolved_node_definition['name'])
         attributes = self.resolved_node_definition['attributes']
         software_id = attributes['software_id']
         executable_id = attributes['executable_id']
@@ -130,7 +125,7 @@ class CreateNode(Command):
         instance_type_id = attributes['instance_type_id']
 
         job_id = self._start_job(cloud_handler, software_id, executable_id,
-            resource_id, region_id, instance_type_id)
+                resource_id, region_id, instance_type_id)
 
         log.debug("[%s] Done; job_id = %r", cloud_handler.name, job_id)
         return job_id
@@ -151,18 +146,12 @@ class DropNode(Command):
         :Remark: This is a "wet method", termination will not be attempted
             if the instance is in debug mode (``dry_run``).
         """
-        rt = drett.ResourceTracker(url=cloud_handler.drett_config['url'])
         for job_id in job_ids:
             r = requests.put(cloud_handler.target + '/jobs/' + job_id + '/stop',
-                auth=get_auth(cloud_handler.auth_data))
+                    auth=get_auth(cloud_handler.auth_data))
 
-            rt.resource_freed_by_attributes(
-                resource_owner=cloud_handler.name,
-                resource_type=cloud_handler.resource_type,
-                resource_id=job_id)
-
-    def perform(self, cloud_handler):
-        """
+            def perform(self, cloud_handler):
+                """
         Terminate a VM instance.
 
         :param instance_data: Information necessary to access the VM instance.
@@ -170,7 +159,7 @@ class DropNode(Command):
         """
         instance_id = self.instance_data['instance_id']
         log.debug("[%s] Dropping node %r", cloud_handler.name,
-                  self.instance_data['node_id'])
+                self.instance_data['node_id'])
 
         self._delete_vms(cloud_handler, instance_id)
 
@@ -184,25 +173,25 @@ class GetState(Command):
     @wet_method('running')
     def perform(self, cloud_handler):
         r = requests.get(cloud_handler.target + '/jobs/' +
-            self.instance_data['instance_id'] + '.xml',
-            auth=get_auth(cloud_handler.auth_data))
+                self.instance_data['instance_id'] + '.xml',
+                auth=get_auth(cloud_handler.auth_data))
         if (r.status_code != 200):
             return status.TMP_FAIL
         DOMTree = xml.dom.minidom.parseString(r.text)
         job = DOMTree.documentElement
         retval = job.getElementsByTagName('status')[0].childNodes[0].data
         if retval=="created" or retval=="submitted" or retval=="assembling" or \
-            retval=="starting" or retval=="preparing":
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.PENDING)
-            return status.PENDING
+                retval=="starting" or retval=="preparing":
+                    log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
+                            retval, status.PENDING)
+                    return status.PENDING
         elif retval=="running":
             log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.READY)
+                    retval, status.READY)
             return status.READY
         elif retval=="stopping" or retval=="finishing" or retval=="completed":
             log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-                      retval, status.SHUTDOWN)
+                    retval, status.SHUTDOWN)
             return status.SHUTDOWN
         else:
             raise NotImplementedError()
@@ -218,7 +207,7 @@ class GetIpAddress(Command):
         int_ip = getTagText(instance.getElementsByTagName('internal-ip-address').item(0).childNodes)
         ext_ip = getTagText(instance.getElementsByTagName('external-ip-address').item(0).childNodes)
         log.debug("[%s] Internal IP is: %s, External IP is: %s", cloud_handler.name,
-            int_ip, ext_ip)
+                int_ip, ext_ip)
         return coalesce(ext_ip, int_ip)
 
 class GetAddress(Command):
@@ -234,7 +223,7 @@ class GetAddress(Command):
         int_ip = getTagText(instance.getElementsByTagName('internal-ip-address').item(0).childNodes)
         ext_ip = getTagText(instance.getElementsByTagName('external-ip-address').item(0).childNodes)
         log.debug("[%s] Internal IP is: %s, External IP is: %s, Internal hostname is: %s, External hostname is: %s",
-            cloud_handler.name, int_ip, ext_ip, int_dns, ext_dns)
+                cloud_handler.name, int_ip, ext_ip, int_dns, ext_dns)
         return coalesce(ext_dns, ext_ip, int_dns, int_ip)
 
 @factory.register(CloudHandler, PROTOCOL_ID)
@@ -249,22 +238,18 @@ class CloudBrokerCloudHandler(CloudHandler):
         * ``email``: The e-mail address used to log in.
         * ``password``: The password belonging to the e-mail address.
 
-    :param dict drett_config: Configuration for the resource allocation
-        tracking service, drett_\ .
     :param str name: The name of this ``CloudHandler`` instance. If unset,
         ``target['endpoint']`` is used.
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
     .. _CloudBroker: http://cloudbroker.com/
     .. _RESTful: https://en.wikipedia.org/wiki/Representational_state_transfer
-    .. _drett: https://github.com/avisegradi/drett
     """
-    def __init__(self, target, auth_data, drett_config,
-                 name=None, dry_run=False,
-                 **config):
+    def __init__(self, target, auth_data, 
+            name=None, dry_run=False,
+            **config):
         self.dry_run = dry_run
         self.name = name if name else target['endpoint']
-        self.drett_config = drett_config
         self.target = target if not dry_run else None
         self.auth_data = auth_data if not dry_run else None
         # The following is intentional. It is a constant yet,

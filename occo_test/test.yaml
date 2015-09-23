@@ -1,9 +1,4 @@
 skip_backend_tests: true
-drett_config: &DRETT_CONFIG
-    url: http://c153-40.localcloud:5002/drett
-    application: occo-test
-    module: boto-handler
-    timeout: 600
 default_mqconfig: !yaml_import &MQCFG
     url: file://mqcfg.yaml
 ip_mqconfig: &IP_MQCFG
@@ -34,8 +29,6 @@ ch_cfgs:
             regionname: ROOT
         auth_data: !yaml_import
             url: file://auth_data.yaml
-        drett_config:
-            <<: *DRETT_CONFIG
 node_defs:
     node1:
         implementation_type: cooked
