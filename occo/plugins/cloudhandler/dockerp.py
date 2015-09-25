@@ -54,10 +54,8 @@ class CreateNode(Command):
         """
         Load Docker image so it can be instantiated.
         """
-        #log.info('[%s] Loading Docker image origin=%r image=%r tag=%r',
-        log.info('Loading Docker image origin=%r image=%r tag=%r',
-                 #cloud_handler.name, self.origin, self.image, self.tag)
-                 self.origin, self.image, self.tag)
+        log.info('[%s] Loading Docker image origin=%r image=%r tag=%r',
+                 cloud_handler.name, self.origin, self.image, self.tag)
         if self.origin == 'dockerhub':
             cloud_handler.cli.pull(repository=self.image, tag=self.tag)
         else:
@@ -68,9 +66,9 @@ class CreateNode(Command):
             )
 
     def perform(self, cloud_handler):
-        #print self.resolved_node_definition
-        #log.debug("[%s] Creating node: %r",
-        #          cloud_handler.name, self.resolved_node_definition)
+        print self.resolved_node_definition
+        log.debug("[%s] Creating node: %r",
+              cloud_handler.name, self.resolved_node_definition)
 
         log.debug("Creating node")
 
@@ -78,7 +76,7 @@ class CreateNode(Command):
         self._load(cloud_handler)
         instance_id = self._start_instance(cloud_handler)
 
-        #log.debug("[%s] Done; container_id = %r", cloud_handler.name, vm_id)
+        log.debug("[%s] Done; container_id = %r", cloud_handler.name, instance_id)
         return instance_id
 
 class DropNode(Command):
@@ -120,24 +118,22 @@ class GetState(Command):
         info = cloud_handler.cli.inspect_container(container=instance_id)
 
         if info['State']['Running']:
-            #log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
-            #          retval, status.READY)
-            log.debug("Done; retval=%r; status=%r",
+            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
                       'Running', status.READY)
             return status.READY
 
         elif info['State']['StartedAt'] == info['State']['FinishedAt']:
-            log.debug("Done; retval=%r; status=%r",
-                      Pending, status.PENDING)
+            log.debug("[%s] Done; retval=%r; status=%r",
+                      'Pending', status.PENDING)
 
         elif info['State']['ExitCode'] == '-1':
-            log.debug("Done; retval=%r; status=%r",
-                      Failed, status.TMP_FAIL)
+            log.debug("[%s] Done; retval=%r; status=%r",
+                      'Failed', status.TMP_FAIL)
             return status.TMP_FAIL
 
         elif not info['State']['Running']:
-            log.debug("Done; retval=%r; status=%r",
-                      Finished, status.SHUTDOWN)
+            log.debug("[%s] Done; retval=%r; status=%r",
+                      'Finished', status.SHUTDOWN)
             return status.SHUTDOWN
         else:
             raise NotImplementedError()
