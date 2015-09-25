@@ -22,14 +22,10 @@ PROTOCOL_ID = 'docker'
 
 log = logging.getLogger('occo.cloudhandler.dockerp')
 
-def getInstance(base_url, instance_id):
-    return docker.Client(base_url).inspect_container(container=instance_id)
-
 class CreateNode(Command):
     def __init__(self, resolved_node_definition):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
-        self.base_url = self.resolved_node_definition['attributes']['base_url']
         self.origin = self.resolved_node_definition['attributes']['origin']
         self.image = self.resolved_node_definition['attributes']['image']
         self.tag = self.resolved_node_definition['attributes']['tag']
@@ -121,8 +117,7 @@ class GetState(Command):
         """
 
         instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
-        base_url = self.instance_data['resolved_node_definition']['attributes']['base_url']
-        info = getInstance(base_url, instance_id)
+        info = cloud_handler.cli.inspect_container(container=instance_id)
 
         if info['State']['Running']:
             #log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
@@ -158,8 +153,7 @@ class GetIpAddress(Command):
         Return (IPv4) network address of the container.
         """
         instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
-        base_url = self.instance_data['resolved_node_definition']['attributes']['base_url']
-        info = getInstance(base_url, instance_id)
+        info = cloud_handler.cli.inspect_container(container=instance_id)
         return coalesce(info['NetworkSettings']['IPAddress'])
 
 class GetAddress(Command):
@@ -173,11 +167,10 @@ class GetAddress(Command):
         Return network address of the container.
         """
         instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
-        base_url = self.instance_data['resolved_node_definition']['attributes']['base_url']
-        info = getInstance(base_url, instance_id)
+        info = cloud_handler.cli.inspect_container(container=instance_id)
         return coalesce(info['NetworkSettings']['IPAddress'])
 
-@factory.register(CloudHandler, 'docker')
+@factory.register(CloudHandler, PROTOCOL_ID)
 class DockerCloudHandler(CloudHandler):
     """ Implementation of the
     :class:`~occo.cloudhandler.CloudHandler` class utilizing Docker_.
@@ -186,7 +179,9 @@ class DockerCloudHandler(CloudHandler):
 
     .. _Docker: https://www.docker.com/
     """
-    def __init__(self, base_url='unix://var/run/docker.sock'):
+    def __init__(self, name, base_url, dry_run, **config):
+        self.dry_run = dry_run
+        self.name = name
         self.base_url = base_url
         self.cli = docker.Client(base_url=base_url)
 
