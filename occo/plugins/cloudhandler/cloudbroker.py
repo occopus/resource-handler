@@ -19,6 +19,7 @@ import occo.constants.status as status
 import requests, json, uuid
 import xml.dom.minidom
 from xml.dom.minidom import parseString
+from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement, tostring
 from time import sleep
 
@@ -67,9 +68,29 @@ class CreateNode(Command):
     def __init__(self, resolved_node_definition):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
+        self.input_type_id = None
+
+    def _upload_file(self, cloud_handler, job_id, filename, content):
+        """
+        Upload a data file for the CloudBroker job
+
+        :param str job_id: The identifier of the job in CloudBroker.
+        :param str filename: The name of the DataFile.
+        :param str content: The content to upload.
+        """
+        self.input_type_id = '13009b8b-ce3d-4fb7-847f-0fa9e5b96460'
+        if self.input_type_id == None:
+            dtypes = requests.get(cloud_handler.target + '/data_types.xml',
+                auth=get_auth(cloud_handler.auth_data))
+            print dtypes.text
+            self.input_type_id = '13009b8b-ce3d-4fb7-847f-0fa9e5b96460'
+        files = {'data': (filename, content)}
+        payload = {'job_id': job_id, 'archive': 'false', 'data_type_id': self.input_type_id}
+        req = requests.post(cloud_handler.target + '/data_files.xml',
+            auth=get_auth(cloud_handler.auth_data), data=payload, files=files)
 
     @wet_method(1)
-    def _start_job(self, cloud_handler, software_id, executable_id, resource_id, region_id, instance_type_id):
+    def _start_job(self, cloud_handler, software_id, executable_id, resource_id, region_id, instance_type_id, app_data, sys_data):
         """
         Start the CloudBroker job.
 
@@ -110,8 +131,9 @@ class CreateNode(Command):
                 rdelete = requests.delete(cloud_handler.target + '/jobs/' +
                         jobid + '.xml', auth=get_auth(cloud_handler.auth_data))
                 jobid = None
-        else:
-            jobid = None
+            self._upload_file(cloud_handler, jobid, 'jobflow-config-app.yaml', app_data)
+            self._upload_file(cloud_handler, jobid, 'jobflow-config-sys.yaml', sys_data)
+            a.set_resource_data(jobid)
         return jobid
 
     def perform(self, cloud_handler):
@@ -123,9 +145,11 @@ class CreateNode(Command):
         resource_id = attributes['resource_id']
         region_id = attributes['region_id']
         instance_type_id = attributes['instance_type_id']
+        app_data = self.resolved_node_definition['app-data']
+        sys_data = self.resolved_node_definition['sys-data']
 
         job_id = self._start_job(cloud_handler, software_id, executable_id,
-                resource_id, region_id, instance_type_id)
+            resource_id, region_id, instance_type_id, app_data, sys_data)
 
         log.debug("[%s] Done; job_id = %r", cloud_handler.name, job_id)
         return job_id
