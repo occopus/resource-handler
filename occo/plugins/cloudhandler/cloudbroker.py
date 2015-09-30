@@ -119,21 +119,23 @@ class CreateNode(Command):
         prtag = SubElement(jobxml, 'permanently-running')
         prtag.text = 'true'
         r = requests.post(cloud_handler.target + '/jobs.xml', tostring(jobxml),
-                auth=get_auth(cloud_handler.auth_data),
-                headers={'Content-Type': 'application/xml'})
+            auth=get_auth(cloud_handler.auth_data),
+            headers={'Content-Type': 'application/xml'})
         if (r.status_code == 201):
             DOMTree = xml.dom.minidom.parseString(r.text)
             job = DOMTree.documentElement
             jobid = job.getElementsByTagName('id')[0].childNodes[0].data
             rsubmit = requests.put(cloud_handler.target + '/jobs/' +
-                    jobid + '/submit.xml', auth=get_auth(cloud_handler.auth_data))
+                jobid + '/submit.xml', auth=get_auth(cloud_handler.auth_data))
             if (rsubmit.status_code != 200):
                 rdelete = requests.delete(cloud_handler.target + '/jobs/' +
-                        jobid + '.xml', auth=get_auth(cloud_handler.auth_data))
+                    jobid + '.xml', auth=get_auth(cloud_handler.auth_data))
                 jobid = None
-            self._upload_file(cloud_handler, jobid, 'jobflow-config-app.yaml', app_data)
-            self._upload_file(cloud_handler, jobid, 'jobflow-config-sys.yaml', sys_data)
-            a.set_resource_data(jobid)
+            else:
+                self._upload_file(cloud_handler, jobid, 'jobflow-config-app.yaml', app_data)
+                self._upload_file(cloud_handler, jobid, 'jobflow-config-sys.yaml', sys_data)
+        else:
+            jobid = None
         return jobid
 
     def perform(self, cloud_handler):
@@ -172,10 +174,10 @@ class DropNode(Command):
         """
         for job_id in job_ids:
             r = requests.put(cloud_handler.target + '/jobs/' + job_id + '/stop',
-                    auth=get_auth(cloud_handler.auth_data))
+                auth=get_auth(cloud_handler.auth_data))
 
-            def perform(self, cloud_handler):
-                """
+    def perform(self, cloud_handler):
+        """
         Terminate a VM instance.
 
         :param instance_data: Information necessary to access the VM instance.
@@ -270,8 +272,8 @@ class CloudBrokerCloudHandler(CloudHandler):
     .. _RESTful: https://en.wikipedia.org/wiki/Representational_state_transfer
     """
     def __init__(self, target, auth_data, 
-            name=None, dry_run=False,
-            **config):
+                 name=None, dry_run=False,
+                 **config):
         self.dry_run = dry_run
         self.name = name if name else target['endpoint']
         self.target = target if not dry_run else None
