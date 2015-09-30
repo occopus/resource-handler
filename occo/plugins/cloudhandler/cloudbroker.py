@@ -15,7 +15,6 @@ from occo.util import wet_method, coalesce
 from occo.cloudhandler import CloudHandler, Command
 import itertools as it
 import logging
-import drett.client as drett
 import occo.constants.status as status
 import requests, json, uuid
 import xml.dom.minidom
@@ -104,43 +103,39 @@ class CreateNode(Command):
         :Remark: This is a "wet method", the job will not be started
             if the instance is in debug mode (``dry_run``).
         """
-        with drett.Allocation(resource_owner=cloud_handler.name,
-                              resource_type=cloud_handler.resource_type,
-                              **cloud_handler.drett_config) as a:
-            jobxml = Element('job')
-            name = SubElement(jobxml, 'name')
-            name.text = str(uuid.uuid4())
-            sid = SubElement(jobxml, 'software-id')
-            sid.text = software_id
-            eid = SubElement(jobxml, 'executable-id')
-            eid.text = executable_id
-            resid = SubElement(jobxml, 'resource-id')
-            resid.text = resource_id
-            regid = SubElement(jobxml, 'region-id')
-            regid.text = region_id
-            itid = SubElement(jobxml, 'instance-type-id')
-            itid.text = instance_type_id
-            prtag = SubElement(jobxml, 'permanently-running')
-            prtag.text = 'true'
-            r = requests.post(cloud_handler.target + '/jobs.xml', tostring(jobxml),
-                auth=get_auth(cloud_handler.auth_data),
-                headers={'Content-Type': 'application/xml'})
-            if (r.status_code == 201):
-                DOMTree = xml.dom.minidom.parseString(r.text)
-                job = DOMTree.documentElement
-                jobid = job.getElementsByTagName('id')[0].childNodes[0].data
-                rsubmit = requests.put(cloud_handler.target + '/jobs/' +
-                    jobid + '/submit.xml', auth=get_auth(cloud_handler.auth_data))
-                if (rsubmit.status_code != 200):
-                    rdelete = requests.delete(cloud_handler.target + '/jobs/' +
-                        jobid + '.xml', auth=get_auth(cloud_handler.auth_data))
-                    jobid = None
-                else:
-                    self._upload_file(cloud_handler, jobid, 'jobflow-config-app.yaml', app_data)
-                    self._upload_file(cloud_handler, jobid, 'jobflow-config-sys.yaml', sys_data)
-            else:
+        jobxml = Element('job')
+        name = SubElement(jobxml, 'name')
+        name.text = str(uuid.uuid4())
+        sid = SubElement(jobxml, 'software-id')
+        sid.text = software_id
+        eid = SubElement(jobxml, 'executable-id')
+        eid.text = executable_id
+        resid = SubElement(jobxml, 'resource-id')
+        resid.text = resource_id
+        regid = SubElement(jobxml, 'region-id')
+        regid.text = region_id
+        itid = SubElement(jobxml, 'instance-type-id')
+        itid.text = instance_type_id
+        prtag = SubElement(jobxml, 'permanently-running')
+        prtag.text = 'true'
+        r = requests.post(cloud_handler.target + '/jobs.xml', tostring(jobxml),
+            auth=get_auth(cloud_handler.auth_data),
+            headers={'Content-Type': 'application/xml'})
+        if (r.status_code == 201):
+            DOMTree = xml.dom.minidom.parseString(r.text)
+            job = DOMTree.documentElement
+            jobid = job.getElementsByTagName('id')[0].childNodes[0].data
+            rsubmit = requests.put(cloud_handler.target + '/jobs/' +
+                jobid + '/submit.xml', auth=get_auth(cloud_handler.auth_data))
+            if (rsubmit.status_code != 200):
+                rdelete = requests.delete(cloud_handler.target + '/jobs/' +
+                    jobid + '.xml', auth=get_auth(cloud_handler.auth_data))
                 jobid = None
-            a.set_resource_data(jobid)
+            else:
+                self._upload_file(cloud_handler, jobid, 'jobflow-config-app.yaml', app_data)
+                self._upload_file(cloud_handler, jobid, 'jobflow-config-sys.yaml', sys_data)
+        else:
+            jobid = None
         return jobid
 
     def perform(self, cloud_handler):
@@ -177,15 +172,9 @@ class DropNode(Command):
         :Remark: This is a "wet method", termination will not be attempted
             if the instance is in debug mode (``dry_run``).
         """
-        rt = drett.ResourceTracker(url=cloud_handler.drett_config['url'])
         for job_id in job_ids:
             r = requests.put(cloud_handler.target + '/jobs/' + job_id + '/stop',
                 auth=get_auth(cloud_handler.auth_data))
-
-            rt.resource_freed_by_attributes(
-                resource_owner=cloud_handler.name,
-                resource_type=cloud_handler.resource_type,
-                resource_id=job_id)
 
     def perform(self, cloud_handler):
         """
@@ -275,22 +264,18 @@ class CloudBrokerCloudHandler(CloudHandler):
         * ``email``: The e-mail address used to log in.
         * ``password``: The password belonging to the e-mail address.
 
-    :param dict drett_config: Configuration for the resource allocation
-        tracking service, drett_\ .
     :param str name: The name of this ``CloudHandler`` instance. If unset,
         ``target['endpoint']`` is used.
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
     .. _CloudBroker: http://cloudbroker.com/
     .. _RESTful: https://en.wikipedia.org/wiki/Representational_state_transfer
-    .. _drett: https://github.com/avisegradi/drett
     """
-    def __init__(self, target, auth_data, drett_config,
+    def __init__(self, target, auth_data, 
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
         self.name = name if name else target['endpoint']
-        self.drett_config = drett_config
         self.target = target if not dry_run else None
         self.auth_data = auth_data if not dry_run else None
         # The following is intentional. It is a constant yet,
