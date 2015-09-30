@@ -135,10 +135,11 @@ class CreateNode(Command):
                     rdelete = requests.delete(cloud_handler.target + '/jobs/' +
                         jobid + '.xml', auth=get_auth(cloud_handler.auth_data))
                     jobid = None
+                else:
+                    self._upload_file(cloud_handler, jobid, 'jobflow-config-app.yaml', app_data)
+                    self._upload_file(cloud_handler, jobid, 'jobflow-config-sys.yaml', sys_data)
             else:
                 jobid = None
-            self._upload_file(cloud_handler, jobid, 'jobflow-config-app.yaml', app_data)
-            self._upload_file(cloud_handler, jobid, 'jobflow-config-sys.yaml', sys_data)
             a.set_resource_data(jobid)
         return jobid
 
