@@ -22,6 +22,7 @@ from xml.dom.minidom import parseString
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement, tostring
 from time import sleep
+import xml.etree.ElementTree as ET
 
 __all__ = ['CloudBrokerCloudHandler']
 
@@ -70,27 +71,67 @@ class CreateNode(Command):
         self.resolved_node_definition = resolved_node_definition
         self.input_type_id = None
 
-    def _upload_file(self, cloud_handler, job_id, filename, content):
+    def _get_input_type_id(self, cloud_handler):
+        """Get the ID of the data file type 'input' from CloudBroker."""
+        log.debug("[%s] Determining ID of input data type...", cloud_handler.name)
+        if self.input_type_id == None:
+            dtypes = requests.get(cloud_handler.target + '/data_types.xml',
+                auth=get_auth(cloud_handler.auth_data))
+            data_types = ET.fromstring(dtypes.text)
+            for data_type in data_types.findall('data-type'):
+                name = data_type.find('name').text
+                dtid = data_type.find('id').text
+                if name == 'input':
+                    return dtid
+            else:
+                log.error("[%s] Could not determine data file ID for input files.", cloud_handler.name)
+                raise NotImplementedError()
+
+    def _upload_file_with_content(self, cloud_handler, job_id, filename, content):
         """
-        Upload a data file for the CloudBroker job
+        Upload a data file for the CloudBroker job by providing the content
 
         :param str job_id: The identifier of the job in CloudBroker.
         :param str filename: The name of the DataFile.
         :param str content: The content to upload.
         """
-        self.input_type_id = '13009b8b-ce3d-4fb7-847f-0fa9e5b96460'
-        if self.input_type_id == None:
-            dtypes = requests.get(cloud_handler.target + '/data_types.xml',
-                auth=get_auth(cloud_handler.auth_data))
-            print dtypes.text
-            self.input_type_id = '13009b8b-ce3d-4fb7-847f-0fa9e5b96460'
+        log.debug("[%s] Uploading file %s with content...", cloud_handler.name, filename)
         files = {'data': (filename, content)}
         payload = {'job_id': job_id, 'archive': 'false', 'data_type_id': self.input_type_id}
         req = requests.post(cloud_handler.target + '/data_files.xml',
             auth=get_auth(cloud_handler.auth_data), data=payload, files=files)
 
+    def _upload_file_with_location(self, cloud_handler, job_id, filename, location):
+        """
+        Upload a data file for the CloudBroker job from a given path
+
+        :param str job_id: The identifier of the job in CloudBroker.
+        :param str filename: The name of the DataFile.
+        :param str location: The path of the file to upload.
+        """
+        log.debug("[%s] Uploading file %s with file from path...", cloud_handler.name, filename)
+        files = {'data': (filename, open(location, 'rb'))}
+        payload = {'job_id': job_id, 'archive': 'false', 'data_type_id': self.input_type_id}
+        req = requests.post(cloud_handler.target + '/data_files.xml',
+            auth=get_auth(cloud_handler.auth_data), data=payload, files=files)
+
+    def _handle_file(self, cloud_handler, job_id, file_info):
+        """
+        Handle a file's upload to CloudBroker. The given file may be defined
+        either using its content or using the location of the file on the
+        filesystem.
+
+        :param str job_id: The identifier of the job
+        :param dict file_info: Dictionary discribing the file
+        """
+        filename = file_info['file_name']
+        if 'content' in file_info:
+            self._upload_file_with_content(cloud_handler, job_id, filename, file_info['content'])
+        elif 'path' in file_info:
+            self._upload_file_with_location(cloud_handler, job_id, filename, file_info['path'])
+
     @wet_method(1)
-    def _start_job(self, cloud_handler, software_id, executable_id, resource_id, region_id, instance_type_id, app_data, sys_data):
+    def _start_job(self, cloud_handler, software_id, executable_id, resource_id, region_id, instance_type_id, files):
         """
         Start the CloudBroker job.
 
@@ -99,10 +140,13 @@ class CreateNode(Command):
         :param str resource_id: The identifier of the Resource in CloudBroker.
         :param str region_id: The identifier of the Region in CloudBroker.
         :param str instance_type_id: The identifier of the instance type in CloudBroker.
+        :param list files: List of files to be uploaded for the job
 
         :Remark: This is a "wet method", the job will not be started
             if the instance is in debug mode (``dry_run``).
         """
+        log.debug("[%s] Creating CloudBroker job...", cloud_handler.name)
+        self.input_type_id = self._get_input_type_id(cloud_handler)
         jobxml = Element('job')
         name = SubElement(jobxml, 'name')
         name.text = str(uuid.uuid4())
@@ -125,15 +169,17 @@ class CreateNode(Command):
             DOMTree = xml.dom.minidom.parseString(r.text)
             job = DOMTree.documentElement
             jobid = job.getElementsByTagName('id')[0].childNodes[0].data
+            log.debug("[%s] CloudBroker job created: %s, now uploading any input files.", cloud_handler.name, jobid)
+            for file_info in files:
+                self._handle_file(cloud_handler, jobid, file_info)
+            log.debug("[%s] Submitting CloudBroker job...", cloud_handler.name)
             rsubmit = requests.put(cloud_handler.target + '/jobs/' +
                 jobid + '/submit.xml', auth=get_auth(cloud_handler.auth_data))
             if (rsubmit.status_code != 200):
                 rdelete = requests.delete(cloud_handler.target + '/jobs/' +
                     jobid + '.xml', auth=get_auth(cloud_handler.auth_data))
                 jobid = None
-            else:
-                self._upload_file(cloud_handler, jobid, 'jobflow-config-app.yaml', app_data)
-                self._upload_file(cloud_handler, jobid, 'jobflow-config-sys.yaml', sys_data)
+            log.debug("[%s] CloudBroker job submitted!", cloud_handler.name)
         else:
             jobid = None
         return jobid
@@ -147,11 +193,14 @@ class CreateNode(Command):
         resource_id = attributes['resource_id']
         region_id = attributes['region_id']
         instance_type_id = attributes['instance_type_id']
-        app_data = self.resolved_node_definition['app-data']
-        sys_data = self.resolved_node_definition['sys-data']
+        files = []
+        if 'template_files' in self.resolved_node_definition:
+            files += self.resolved_node_definition['template_files']
+        if 'files' in self.resolved_node_definition:
+            files += self.resolved_node_definition['files']
 
         job_id = self._start_job(cloud_handler, software_id, executable_id,
-            resource_id, region_id, instance_type_id, app_data, sys_data)
+            resource_id, region_id, instance_type_id, files)
 
         log.debug("[%s] Done; job_id = %r", cloud_handler.name, job_id)
         return job_id
@@ -271,7 +320,7 @@ class CloudBrokerCloudHandler(CloudHandler):
     .. _CloudBroker: http://cloudbroker.com/
     .. _RESTful: https://en.wikipedia.org/wiki/Representational_state_transfer
     """
-    def __init__(self, target, auth_data, 
+    def __init__(self, target, auth_data,
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
