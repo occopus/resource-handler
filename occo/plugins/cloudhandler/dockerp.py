@@ -30,7 +30,7 @@ class CreateNode(Command):
         self.image = self.resolved_node_definition['attributes']['image']
         self.tag = self.resolved_node_definition['attributes']['tag']
         self.command = self.resolved_node_definition['attributes']['command']
-        #self.environment = self.resolved_node_definition['attributes']['environment']
+        self.env = self.resolved_node_definition['attributes']['env']
 
     @wet_method('dummyid')
     def _start_instance(self, cloud_handler):
@@ -42,7 +42,7 @@ class CreateNode(Command):
         container = cli.create_container(
             image='{0.image}:{0.tag}'.format(self),
             command=self.command,
-            #environment=self.environment
+            environment=self.env
         )
 
         cli.start(container.get('Id'))
