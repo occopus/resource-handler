@@ -14,6 +14,7 @@ setuptools.setup(
         'occo.plugins.cloudhandler',
     ],
     py_modules=[
+        'occo.plugins.cloudhandler.nova',
         'occo.plugins.cloudhandler.cloudbroker',
         'occo.plugins.cloudhandler.dummy',
         'occo.plugins.cloudhandler.boto'
