@@ -1,3 +1,16 @@
+### Copyright 2014, MTA SZTAKI, www.sztaki.hu
+###
+### Licensed under the Apache License, Version 2.0 (the "License");
+### you may not use this file except in compliance with the License.
+### You may obtain a copy of the License at
+###
+###    http://www.apache.org/licenses/LICENSE-2.0
+###
+### Unless required by applicable law or agreed to in writing, software
+### distributed under the License is distributed on an "AS IS" BASIS,
+### WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+### See the License for the specific language governing permissions and
+### limitations under the License.
 #!/dev/null
 
 import unittest
@@ -49,7 +62,6 @@ class BotoTest(unittest.TestCase):
 
             self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
             self.uds = UDS.instantiate(protocol='dict')
-    ##        self.uds.kvstore.set_item('node_def:test', [self.node_def])
             mib = ib.real_main_info_broker = \
                 ib.InfoRouter(sub_providers=[
                     self.uds,
@@ -140,11 +152,9 @@ class BotoTest(unittest.TestCase):
     def test_node_status(self):
         self.ch = CloudHandler(self.cfg)
         last_exception = None
-##        node_def = cfg.node_defs['node1']
 
         self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
         self.uds = UDS.instantiate(protocol='dict')
-##        self.uds.kvstore.set_item('node_def:test', [node_def])
         mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
             self.uds,
             self.sc,
