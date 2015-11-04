@@ -18,9 +18,9 @@ from pip.req import parse_requirements
 
 setuptools.setup(
     name='OCCO-CloudHandler',
-    version='0.1.0',
-    author='Adam Visegradi',
-    author_email='adam.visegradi@sztaki.mta.hu',
+    version='0.2.0',
+    author='MTA SZTAKI',
+    author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
         'occo',
         'occo.plugins',
@@ -36,9 +36,9 @@ setuptools.setup(
         'occo.cloudhandler',
     ],
     scripts=[],
-    url='http://www.lpds.sztaki.hu/',
+    url='https://github.com/occopus',
     license='LICENSE.txt',
-    description='OCCO Cloud Handler',
+    description='Occopus Cloud Handler',
     long_description=open('README.txt').read(),
     install_requires=[
         'argparse',
