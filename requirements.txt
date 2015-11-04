@@ -1,3 +1,6 @@
-argparse>=1.2.1
-PyYAML>=3.10
-python-dateutil>=2.2
+argparse==1.2.1
+boto==2.34.0
+python-dateutil==2.2
+PyYAML==3.11
+OCCO-Util==0.2.0
+OCCO-InfoBroker==0.2.0

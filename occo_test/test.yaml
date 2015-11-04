@@ -1,0 +1,56 @@
+skip_backend_tests: true
+default_mqconfig: !yaml_import &MQCFG
+    url: file://mqcfg.yaml
+ip_mqconfig: &IP_MQCFG
+    <<: *MQCFG
+    queue: remote_infobroker_test
+    routing_key: remote_infobroker_test
+ctl_mqconfig: &CTL_MQCFG
+    <<: *MQCFG
+    queue: remote_infobroker_test_ctl
+    routing_key: remote_infobroker_test_ctl
+ch_cfgs:
+    dummy: 
+        protocol: dummy
+        target:
+            url: https://example.org/
+        auth_data:
+            backend_specific_auth_data: almafa
+        kvstore: !KeyValueStore
+            protocol: dict
+            init_dict:
+                test: 1
+                testt: 2
+    lpds:
+        protocol: boto
+        name: LPDS-Cloud
+        target:
+            endpoint: http://cfe2.lpds.sztaki.hu:4567
+            regionname: ROOT
+        auth_data: !yaml_import
+            url: file://auth_data.yaml
+node_defs:
+    node1:
+        implementation_type: cooked
+        backend_id: dummy
+        servicecomposer_id: dummy
+        image_id: ami-00001082 # Ubuntu 14.04 cloud-init
+        instance_type: m1.small
+        context: ''
+        name: node1
+        infra_id: 1
+        node_id: 10
+
+    node_lpds:
+        implementation_type: cooked
+        backend_id: lpds
+        servicecomposer_id: dummy
+        image_id: ami-00001082 # Ubuntu 14.04 cloud-init
+        instance_type: m1.small
+        context: ''
+        name: node_lpds
+        infra_id: 2
+        node_id: 20
+
+logging: !yaml_import
+    url: file://logging.yaml

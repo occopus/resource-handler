@@ -1,1 +1,11 @@
-v0.1.0 -- Initial release
+
+v0.2.0 - November 2015
+- Multi-cloud support
+- Cloudhandler: nova (for openstack)
+- Cloudhandler: cloudbroker (for cloudbroker)
+- Remove drett
+- Generalize resource states
+- Introduce command pattern
+- Introduce dry_run option (to simulate resource allocation)
+- Cloudhandler: boto (for amazon and opennebula)
+
