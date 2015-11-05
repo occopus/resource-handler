@@ -90,15 +90,8 @@ class CreateNode(Command):
         image_id = node_def['image_id']
         flavor_name = node_def['flavor_name']
         context = node_def['context']
-        if 'security_groups' in node_def:
-            sec_groups = node_def['security_groups']
-        else:
-            sec_groups = None
-        print 'SEC: ' + str(sec_groups)
-        if 'key_name' in node_def:
-            key_name = node_def['key_name']
-        else:
-            key_name = None
+        sec_groups = node_def.get('security_groups', None)
+        key_name = node_def.get('key_name', None)
         server_name = str(uuid.uuid4())
         log.debug("[%s] Creating new server using image ID %r and flavor name %r",
             cloud_handler.name, image_id, flavor_name)
