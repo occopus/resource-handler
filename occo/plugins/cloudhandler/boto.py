@@ -90,32 +90,33 @@ class CreateNode(Command):
 
     @wet_method(1)
     @needs_connection
-    def _start_instance(self, cloud_handler, image_id, instance_type, context):
+    def _start_instance(self, cloud_handler):
         """
         Start the VM instance.
-
-        :param str image_id: The image identifier in the backend cloud.
-        :param str instance_type: The instance type as specified by the
-            backend cloud (e.g. m1.small).
-        :param str context: Contextualization for the VM instane.
 
         :Remark: This is a "wet method", the VM will not be started
             if the instance is in debug mode (``dry_run``).
         """
+        image_id = self.resolved_node_definition['image_id']
+        instance_type = self.resolved_node_definition['instance_type']
+        context = self.resolved_node_definition['context']
+        key_name = self.resolved_node_definition.get('key_name', None)
+        sec_group_ids = self.resolved_node_definition.get('security_group_ids', None)
+        subnet_id = self.resolved_node_definition.get('subnet_id', None)
         reservation = self.conn.run_instances(image_id=image_id,
                                               instance_type=instance_type,
-                                              user_data=context)
+                                              user_data=context,
+                                              key_name=key_name,
+                                              subnet_id=subnet_id,
+                                              security_group_ids=sec_group_ids)
         vm_id = reservation.instances[0].id
         return vm_id
 
     def perform(self, cloud_handler):
         log.debug("[%s] Creating node: %r",
                   cloud_handler.name, self.resolved_node_definition['name'])
-        image_id = self.resolved_node_definition['image_id']
-        instance_type = self.resolved_node_definition['instance_type']
-        context = self.resolved_node_definition['context']
 
-        vm_id = self._start_instance(cloud_handler, image_id, instance_type, context)
+        vm_id = self._start_instance(cloud_handler)
 
         log.debug("[%s] Done; vm_id = %r", cloud_handler.name, vm_id)
         return vm_id
@@ -124,7 +125,7 @@ class DropNode(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
         self.instance_data = instance_data    
-    
+
     @wet_method()
     @needs_connection
     def _delete_vms(self, cloud_handler, *vm_ids):
@@ -187,7 +188,9 @@ class GetIpAddress(Command):
                   cloud_handler.name,
                   self.instance_data['node_id'])
         inst = get_instance(self.conn, self.instance_data['instance_id'])
-        return coalesce(inst.ip_address, inst.private_ip_address)
+        ip_address = None if inst.ip_address is '' else inst.ip_address
+        private_ip_address = None if inst.private_ip_address is '' else inst.private_ip_address
+        return coalesce(ip_address, private_ip_address)
 
 class GetAddress(Command):
     def __init__(self, instance_data):
@@ -201,9 +204,12 @@ class GetAddress(Command):
                   cloud_handler.name,
                   self.instance_data['node_id'])
         inst = get_instance(self.conn, self.instance_data['instance_id'])
-        return coalesce(inst.public_dns_name,
-                        inst.ip_address,
-                        inst.private_ip_address)
+        public_dns_name = None if inst.public_dns_name is '' else inst.public_dns_name
+        ip_address = None if inst.ip_address is '' else inst.ip_address
+        private_ip_address = None if inst.private_ip_address is '' else inst.private_ip_address
+        return coalesce(public_dns_name,
+                        ip_address,
+                        private_ip_address)
 
 @factory.register(CloudHandler, PROTOCOL_ID)
 class BotoCloudHandler(CloudHandler):
