@@ -58,7 +58,6 @@ def setup_connection(target, auth_data, auth_type):
         password = auth_data['password']
         nt = client.Client('2.0', user, password, tenant_name, auth_url)
     elif auth_type == 'voms':
-        proxy = auth_data
         novaclient.auth_plugin.discover_auth_systems()
         auth_plugin = novaclient.auth_plugin.load_plugin(auth_type)
         auth_plugin.opts["x509_user_proxy"] = auth_data
