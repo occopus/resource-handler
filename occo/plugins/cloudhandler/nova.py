@@ -20,7 +20,9 @@
 
 import time
 import uuid
-from novaclient import client
+import novaclient
+import novaclient.client
+import novaclient.auth_plugin
 import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce
@@ -39,21 +41,27 @@ STATE_MAPPING = {
     'VERIFY_RESIZE' : status.PENDING,
     'MIGRATING'     : status.PENDING,
     'ACTIVE'        : status.READY,
-    'ERROR'         : status.TMP_FAIL,
+    'ERROR'         : status.FAIL,
     'DELETED'       : status.SHUTDOWN,
 }
 
 log = logging.getLogger('occo.cloudhandler.nova')
 
-def setup_connection(target, auth_data):
+def setup_connection(target, auth_data, auth_type):
     """
     Setup the connection to the Nova endpoint.
     """
     auth_url = target['auth_url']
     tenant_name = target['tenant_name']
-    user = auth_data['username']
-    password = auth_data['password']
-    nt = client.Client('2.0', user, password, tenant_name, auth_url, insecure=True)
+    if auth_type is None:
+        user = auth_data['username']
+        password = auth_data['password']
+        nt = client.Client('2.0', user, password, tenant_name, auth_url)
+    elif auth_type == 'voms':
+        novaclient.auth_plugin.discover_auth_systems()
+        auth_plugin = novaclient.auth_plugin.load_plugin(auth_type)
+        auth_plugin.opts["x509_user_proxy"] = auth_data
+        nt = novaclient.client.Client('2.0', None, None, tenant_name, auth_url, auth_plugin=auth_plugin, auth_system=auth_type)
     return nt
 
 def needs_connection(f):
@@ -223,6 +231,7 @@ class NovaCloudHandler(CloudHandler):
         * ``endpoint``: URL of the interface.
         * ``regionname``: The name of the EC2 region.
 
+    :param str auth_type: The type of authentication plugin to use.
     :param dict auth_data: Authentication infomration for the connection.
 
         * ``username``: The access key.
@@ -233,18 +242,18 @@ class NovaCloudHandler(CloudHandler):
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
     """
-    def __init__(self, target, auth_data, 
+    def __init__(self, target, auth_type, auth_data,
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
         self.name = name if name else target['auth_url']
-        self.target, self.auth_data = target, auth_data
+        self.target, self.auth_data, self.auth_type = target, auth_data, auth_type
         # The following is intentional. It is a constant yet, but maybe it'll
         # change in the future.
         self.resource_type = 'vm'
 
     def get_connection(self):
-        return setup_connection(self.target, self.auth_data)
+        return setup_connection(self.target, self.auth_data, self.auth_type)
 
     def cri_create_node(self, resolved_node_definition):
         return CreateNode(resolved_node_definition)
