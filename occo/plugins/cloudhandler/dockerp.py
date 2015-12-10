@@ -71,8 +71,8 @@ class CreateNode(Command):
         if self.origin == 'dockerhub':
             cloud_handler.cli.pull(repository=self.image, tag=self.tag)
         else:
-            cloud_handler.cli.import_image(
-                src=self.origin,
+            cloud_handler.cli.import_image_from_url(
+                url=self.origin,
                 repository=self.image,
                 tag=self.tag
             )
