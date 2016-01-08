@@ -22,7 +22,7 @@ import time
 import uuid
 import urlparse
 import occo.util.factory as factory
-from occo.util import wet_method, coalesce
+from occo.util import wet_method, coalesce, basic_run_process
 from occo.cloudhandler import CloudHandler, Command
 import itertools as it
 import logging
@@ -43,18 +43,23 @@ STATE_MAPPING = {
 
 log = logging.getLogger('occo.cloudhandler.nova')
 
-def execute_command(target, auth_data, *args):
+def execute_command(target, auth_data, *args, **kwargs):
     """
     Execute a custom command towards the target.
     """
-    cmd = ["occi", "-o", "json", "-X", "-n", "x509", "-x", auth_data, "-e", target['endpoint']]
+    cmd = ["occi", "-X", "-n", "x509", "-x", auth_data, "-e", target['endpoint']]
     cmd.extend(args)
-    log.debug("Command is: %r", cmd)
-    p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    out, err = p.communicate()
+    #log.debug("Command is: %r", cmd)
+    ret, out, err = basic_run_process(" ".join(cmd), input_data=kwargs.get('stdin'))
+    #if 'stdin' in kwargs:
+        #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+        #p.stdin.write(kwargs.get('stdin'))
+    #else:
+        #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    #out, err = p.communicate()
     log.debug("Command response is: %r", out)
     log.debug("Command stderr response is: %r", err)
-    p.wait()
+    #p.wait()
     return out
 
 class CreateNode(Command):
@@ -77,8 +82,10 @@ class CreateNode(Command):
         context = node_def['context']
         log.debug("[%s] Creating new server using OS TPL %r and RESOURCE TPL %r",
             cloud_handler.name, os_tpl, resource_tpl)
-        server = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "create", "-r", "compute",
-            "-M", os_tpl, "-M", resource_tpl, "-t", "occi.core.title=OCCO_OCCI_VM").splitlines()
+        server = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a",
+            "create", "-r", "compute", "-M", os_tpl, "-M", resource_tpl, "-t",
+            "occi.core.title=OCCO_OCCI_VM", "-T", "user_data=file:///dev/stdin",
+            stdin=context).splitlines()
         return server[0]
 
     def perform(self, cloud_handler):
@@ -134,7 +141,7 @@ class DropNode(Command):
             if the instance is in debug mode (``dry_run``).
         """
         for server in vm_ids:
-            execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "-delete", "-r", server)
+            res = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "delete", "-r", server)
 
     def perform(self, cloud_handler):
         """
