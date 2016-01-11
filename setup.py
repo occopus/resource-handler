@@ -42,11 +42,14 @@ setuptools.setup(
     long_description=open('README.txt').read(),
     install_requires=[
         'argparse',
+        'backports.ssl-match-hostname',
         'boto',
+        'docker-py',
         'python-dateutil',
         'PyYAML',
         'OCCO-Util',
         'OCCO-InfoBroker',
         'requests',
+        'websocket-client'
     ],
 )
