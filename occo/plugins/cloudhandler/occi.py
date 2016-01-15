@@ -1,4 +1,4 @@
-### Copyright 2014, MTA SZTAKI, www.sztaki.hu
+### Copyright 2016, MTA SZTAKI, www.sztaki.hu
 ###
 ### Licensed under the Apache License, Version 2.0 (the "License");
 ### you may not use this file except in compliance with the License.
@@ -12,7 +12,7 @@
 ### See the License for the specific language governing permissions and
 ### limitations under the License.
 
-""" OpenStack Nova implementation of the
+""" OCCI implementation of the
 :class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
 
 .. moduleauthor:: Zoltan Farkas <zoltan.farkas@sztaki.mta.hu>
@@ -20,64 +20,47 @@
 
 import time
 import uuid
-import novaclient
-import novaclient.client
-import novaclient.auth_plugin
 import urlparse
 import occo.util.factory as factory
-from occo.util import wet_method, coalesce
+from occo.util import wet_method, coalesce, basic_run_process
 from occo.cloudhandler import CloudHandler, Command
 import itertools as it
 import logging
 import occo.constants.status as status
+import subprocess
+import json
+from pprint import pprint
 
-__all__ = ['NovaCloudHandler']
+__all__ = ['OCCICloudHandler']
 
-PROTOCOL_ID = 'nova'
+PROTOCOL_ID = 'occi'
 STATE_MAPPING = {
-    'BUILD'         : status.PENDING,
-    'REBUILD'       : status.PENDING,
-    'RESIZE'        : status.PENDING,
-    'VERIFY_RESIZE' : status.PENDING,
-    'MIGRATING'     : status.PENDING,
-    'ACTIVE'        : status.READY,
-    'ERROR'         : status.FAIL,
-    'DELETED'       : status.SHUTDOWN,
+    'waiting'         : status.PENDING,
+    'inactive'        : status.PENDING,
+    'active'          : status.READY,
+    'suspended'       : status.SHUTDOWN,
 }
 
 log = logging.getLogger('occo.cloudhandler.nova')
 
-def setup_connection(target, auth_data, auth_type):
+def execute_command(target, auth_data, *args, **kwargs):
     """
-    Setup the connection to the Nova endpoint.
+    Execute a custom command towards the target.
     """
-    auth_url = target['auth_url']
-    tenant_name = target['tenant_name']
-    if auth_type is None:
-        user = auth_data['username']
-        password = auth_data['password']
-        nt = client.Client('2.0', user, password, tenant_name, auth_url)
-    elif auth_type == 'voms':
-        novaclient.auth_plugin.discover_auth_systems()
-        auth_plugin = novaclient.auth_plugin.load_plugin(auth_type)
-        auth_plugin.opts["x509_user_proxy"] = auth_data
-        nt = novaclient.client.Client('2.0', None, None, tenant_name, auth_url, auth_plugin=auth_plugin, auth_system=auth_type)
-    return nt
-
-def needs_connection(f):
-    """
-    Sets up the conn member of the Command object upon calling this method.
-
-    If this decorator is specified *inside* (after) ``@wet_method``, the
-    connection will not be established upon dry run.
-    """
-    import functools
-    @functools.wraps(f)
-    def g(self, cloud_handler, *args, **kwargs):
-        self.conn = cloud_handler.get_connection()
-        return f(self, cloud_handler, *args, **kwargs)
-
-    return g
+    cmd = ["occi", "-X", "-n", "x509", "-x", auth_data, "-e", target['endpoint']]
+    cmd.extend(args)
+    #log.debug("Command is: %r", cmd)
+    ret, out, err = basic_run_process(" ".join(cmd), input_data=kwargs.get('stdin'))
+    #if 'stdin' in kwargs:
+        #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
+        #p.stdin.write(kwargs.get('stdin'))
+    #else:
+        #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    #out, err = p.communicate()
+    log.debug("Command response is: %r", out)
+    log.debug("Command stderr response is: %r", err)
+    #p.wait()
+    return out
 
 class CreateNode(Command):
     def __init__(self, resolved_node_definition):
@@ -85,7 +68,6 @@ class CreateNode(Command):
         self.resolved_node_definition = resolved_node_definition
 
     @wet_method(1)
-    @needs_connection
     def _start_instance(self, cloud_handler, node_def):
         """
         Start the VM instance.
@@ -95,54 +77,59 @@ class CreateNode(Command):
         :Remark: This is a "wet method", the VM will not be started
             if the instance is in debug mode (``dry_run``).
         """
-        image_id = node_def['image_id']
-        flavor_name = node_def['flavor_name']
+        os_tpl = node_def['os_tpl']
+        resource_tpl = node_def['resource_tpl']
         context = node_def['context']
-        sec_groups = node_def.get('security_groups', None)
-        key_name = node_def.get('key_name', None)
-        server_name = str(uuid.uuid4())
-        log.debug("[%s] Creating new server using image ID %r and flavor name %r",
-            cloud_handler.name, image_id, flavor_name)
-        server = self.conn.servers.create(server_name, image_id, flavor_name,
-            security_groups=sec_groups, key_name=key_name, userdata=context)
-        log.debug('Reservation: %r, server ID: %r', server, server.id)
-        return server
+        log.debug("[%s] Creating new server using OS TPL %r and RESOURCE TPL %r",
+            cloud_handler.name, os_tpl, resource_tpl)
+        server = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a",
+            "create", "-r", "compute", "-M", os_tpl, "-M", resource_tpl, "-t",
+            "occi.core.title=OCCO_OCCI_VM", "-T", "user_data=file:///dev/stdin",
+            stdin=context).splitlines()
+        return server[0]
 
     def perform(self, cloud_handler):
         log.debug("[%s] Creating node: %r",
                   cloud_handler.name, self.resolved_node_definition['name'])
 
         server = self._start_instance(cloud_handler, self.resolved_node_definition)
-        log.debug("[%s] Done; vm_id = %r", cloud_handler.name, server.id)
+        log.debug("[%s] Done; vm_id = %s", cloud_handler.name, server)
 
-        if 'floating_ip' in self.resolved_node_definition:
-            floating_ip = self.conn.floating_ips.create()
-            log.debug("[%s] Created floating IP: %r", cloud_handler.name, floating_ip)
-            attempts = 0
-            while attempts < 10:
-                try:
-                    log.debug("[%s] Adding floating IP to server...", cloud_handler.name)
-                    server.add_floating_ip(floating_ip)
-                except Exception as e:
-                    log.debug(e)
-                    time.sleep(1)
-                    attempts += 1
-                else:
-                    log.debug("[%s] Added floating IP to server", cloud_handler.name)
-                    break
-            if attempts == 5:
-                log.error("[%s] Failed to add floating IP to server", cloud_handler.name)
-                self.conn.floating_ips.delete(floating_ip)
-                raise Exception('Failed to add floating IP')
-        return server.id
+        status = 'inactive'
+        while status != 'active':
+            time.sleep(10)
+            description = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "describe",
+                "-r", server, "-o", "json")
+            djson = json.loads(description)[0]
+            status = djson['attributes']['occi']['compute']['state']
+            log.debug("[%s] Status of VM %s is: %s", cloud_handler.name, server, status)
+
+        if 'link' in self.resolved_node_definition:
+            for link in self.resolved_node_definition.get('link'):
+                attempts = 0
+                while attempts < 10:
+                    try:
+                        log.debug("[%s] Adding link %s to server...", cloud_handler.name, link)
+                        linked = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "link", "-r", server,
+                            "-j", link)
+                    except Exception as e:
+                        log.debug(e)
+                        time.sleep(1)
+                        attempts += 1
+                    else:
+                        log.debug("[%s] Added link to server", cloud_handler.name)
+                        break
+                if attempts == 5:
+                    log.error("[%s] Failed to add link to server", cloud_handler.name)
+                    raise Exception('Failed to add link to server')
+        return server
 
 class DropNode(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
-        self.instance_data = instance_data    
+        self.instance_data = instance_data
 
     @wet_method()
-    @needs_connection
     def _delete_vms(self, cloud_handler, *vm_ids):
         """
         Terminate VM instances.
@@ -153,14 +140,8 @@ class DropNode(Command):
         :Remark: This is a "wet method", termination will not be attempted
             if the instance is in debug mode (``dry_run``).
         """
-        server = self.conn.servers.get(vm_ids)
-        floating_ips = self.conn.floating_ips.list()
-        for floating_ip in floating_ips:
-            if floating_ip.instance_id == server.id:
-                log.debug("[%s] Removing floating IP %r allocated for the VM",
-                    cloud_handler.name, floating_ip.ip)
-                self.conn.floating_ips.delete(floating_ip)
-        self.conn.servers.delete(server)
+        for server in vm_ids:
+            res = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "delete", "-r", server)
 
     def perform(self, cloud_handler):
         """
@@ -183,18 +164,19 @@ class GetState(Command):
         self.instance_data = instance_data
 
     @wet_method('ready')
-    @needs_connection
     def perform(self, cloud_handler):
         log.debug("[%s] Acquiring node state %r",
                   cloud_handler.name, self.instance_data['node_id'])
-        server = self.conn.servers.get(self.instance_data['instance_id'])
-        inst_state = server.status
+        description = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "describe",
+            "-r", self.instance_data['instance_id'], "-o", "json")
+        djson = json.loads(description)[0]
+        inst_state = djson['attributes']['occi']['compute']['state']
         try:
             retval = STATE_MAPPING[inst_state]
         except KeyError:
-            raise NotImplementedError('Unknown Nova state', inst_state)
+            raise NotImplementedError('Unknown OCCI state', inst_state)
         else:
-            log.debug("[%s] Done; nova_state=%r; status=%r",
+            log.debug("[%s] Done; occi_state=%r; status=%r",
                       cloud_handler.name, inst_state, retval)
             return retval
 
@@ -204,27 +186,26 @@ class GetIpAddress(Command):
         self.instance_data = instance_data
 
     @wet_method('127.0.0.1')
-    @needs_connection
     def perform(self, cloud_handler):
         log.debug("[%s] Acquiring IP address for %r",
                   cloud_handler.name,
                   self.instance_data['node_id'])
-        server = self.conn.servers.get(self.instance_data['instance_id'])
-        floating_ips = self.conn.floating_ips.list()
-        for floating_ip in floating_ips:
-            if floating_ip.instance_id == server.id:
-                return floating_ip.ip
-        networks = self.conn.servers.ips(server)
-        for tenant in networks.keys():
-            for addre in networks[tenant]:
-                return addre['addr'].encode('latin-1')
+        description = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "describe",
+            "-r", self.instance_data['instance_id'], "-o", "json")
+        djson = json.loads(description)
+        for link in djson[0]['links']:
+            ltype = link['kind']
+            lattrs = link['attributes']['occi']
+            if 'networkinterface' in lattrs:
+                ip = lattrs['networkinterface']['address']
+                return ip
         return None
 
 @factory.register(CloudHandler, PROTOCOL_ID)
-class NovaCloudHandler(CloudHandler):
+class OCCICloudHandler(CloudHandler):
     """ Implementation of the
     :class:`~occo.cloudhandler.cloudhandler.CloudHandler` class utilizing the
-    OpenStack Nova interface.
+    OCCI interface.
 
     :param dict target: Definition of the EC2 endpoint. This must contain:
 
@@ -242,12 +223,12 @@ class NovaCloudHandler(CloudHandler):
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
     """
-    def __init__(self, target, auth_type, auth_data,
+    def __init__(self, target, auth_data,
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
         self.name = name if name else target['auth_url']
-        self.target, self.auth_data, self.auth_type = target, auth_data, auth_type
+        self.target, self.auth_data = target, auth_data
         # The following is intentional. It is a constant yet, but maybe it'll
         # change in the future.
         self.resource_type = 'vm'

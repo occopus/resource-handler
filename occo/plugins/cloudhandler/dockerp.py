@@ -37,6 +37,7 @@ class CreateNode(Command):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
         self.origin = self.resolved_node_definition['attributes']['origin']
+        self.network_mode = self.resolved_node_definition['attributes']['network_mode']
         self.image = self.resolved_node_definition['attributes']['image']
         self.tag = self.resolved_node_definition['attributes']['tag']
         self.command = self.resolved_node_definition['attributes']['command']
@@ -55,6 +56,7 @@ class CreateNode(Command):
             environment=self.env
         )
 
+        cli.create_host_config(network_mode=self.network_mode)
         cli.start(container.get('Id'))
         log.debug('Started container [%s]', container)
         return str(container)
@@ -69,8 +71,8 @@ class CreateNode(Command):
         if self.origin == 'dockerhub':
             cloud_handler.cli.pull(repository=self.image, tag=self.tag)
         else:
-            cloud_handler.cli.import_image(
-                src=self.origin,
+            cloud_handler.cli.import_image_from_url(
+                url=self.origin,
                 repository=self.image,
                 tag=self.tag
             )
@@ -81,7 +83,6 @@ class CreateNode(Command):
               cloud_handler.name, self.resolved_node_definition)
 
         log.debug("Creating node")
-
 
         self._load(cloud_handler)
         instance_id = self._start_instance(cloud_handler)

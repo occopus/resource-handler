@@ -1,4 +1,9 @@
 
+v0.3.0 - January 2016
+- voms-based auth added to nova plugin
+- new plugin: docker
+- new plugin: occi
+
 v0.2.1 - 10th November 2015
 - support for security group, subnet and keypairs in EC2 plugin
 
