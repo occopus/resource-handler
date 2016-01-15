@@ -18,7 +18,7 @@ from pip.req import parse_requirements
 
 setuptools.setup(
     name='OCCO-CloudHandler',
-    version='0.2.0',
+    version='0.3.0',
     author='MTA SZTAKI',
     author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
@@ -30,7 +30,9 @@ setuptools.setup(
         'occo.plugins.cloudhandler.nova',
         'occo.plugins.cloudhandler.cloudbroker',
         'occo.plugins.cloudhandler.dummy',
-        'occo.plugins.cloudhandler.boto'
+        'occo.plugins.cloudhandler.boto',
+	'occo.plugins.cloudhandler.dockerp',
+	'occo.plugins.cloudhandler.occi'
     ],
     packages=[
         'occo.cloudhandler',
