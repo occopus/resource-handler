@@ -50,13 +50,14 @@ class CreateNode(Command):
         """
         log.debug('Starting container')
         cli = cloud_handler.cli
+        host_config=cli.create_host_config(network_mode=self.network_mode)
         container = cli.create_container(
             image='{0.image}:{0.tag}'.format(self),
             command=self.command,
+            host_config=host_config,
             environment=self.env
         )
 
-        cli.create_host_config(network_mode=self.network_mode)
         cli.start(container.get('Id'))
         log.debug('Started container [%s]', container)
         return str(container)
@@ -161,7 +162,10 @@ class GetIpAddress(Command):
         """
         instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
         info = cloud_handler.cli.inspect_container(container=instance_id)
-        return coalesce(info['NetworkSettings']['IPAddress'])
+        ip_addresses = []
+        for k, v in info['NetworkSettings']['Networks'].iteritems():
+            ip_addresses.append(v['IPAddress'])
+        return ip_addresses[0]
 
 class GetAddress(Command):
     def __init__(self, instance_data):
@@ -175,7 +179,10 @@ class GetAddress(Command):
         """
         instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
         info = cloud_handler.cli.inspect_container(container=instance_id)
-        return coalesce(info['NetworkSettings']['IPAddress'])
+        ip_addresses = []
+        for k, v in info['NetworkSettings']['Networks'].iteritems():
+            ip_addresses.append(v['IPAddress'])
+        return ip_addresses[0]
 
 @factory.register(CloudHandler, PROTOCOL_ID)
 class DockerCloudHandler(CloudHandler):
