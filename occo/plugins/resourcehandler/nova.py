@@ -13,7 +13,7 @@
 ### limitations under the License.
 
 """ OpenStack Nova implementation of the
-:class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
+:class:`~occo.resourcehandler.resourcehandler.ResourceHandler` class.
 
 .. moduleauthor:: Zoltan Farkas <zoltan.farkas@sztaki.mta.hu>
 """
@@ -26,12 +26,12 @@ import novaclient.auth_plugin
 import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce
-from occo.cloudhandler import CloudHandler, Command
+from occo.resourcehandler import ResourceHandler, Command
 import itertools as it
 import logging
 import occo.constants.status as status
 
-__all__ = ['NovaCloudHandler']
+__all__ = ['NovaResourceHandler']
 
 PROTOCOL_ID = 'nova'
 STATE_MAPPING = {
@@ -45,7 +45,7 @@ STATE_MAPPING = {
     'DELETED'       : status.SHUTDOWN,
 }
 
-log = logging.getLogger('occo.cloudhandler.nova')
+log = logging.getLogger('occo.resourcehandler.nova')
 
 def setup_connection(target, auth_data, auth_type):
     """
@@ -73,9 +73,9 @@ def needs_connection(f):
     """
     import functools
     @functools.wraps(f)
-    def g(self, cloud_handler, *args, **kwargs):
-        self.conn = cloud_handler.get_connection()
-        return f(self, cloud_handler, *args, **kwargs)
+    def g(self, resource_handler, *args, **kwargs):
+        self.conn = resource_handler.get_connection()
+        return f(self, resource_handler, *args, **kwargs)
 
     return g
 
@@ -86,7 +86,7 @@ class CreateNode(Command):
 
     @wet_method(1)
     @needs_connection
-    def _start_instance(self, cloud_handler, node_def):
+    def _start_instance(self, resource_handler, node_def):
         """
         Start the VM instance.
 
@@ -102,36 +102,36 @@ class CreateNode(Command):
         key_name = node_def.get('key_name', None)
         server_name = str(uuid.uuid4())
         log.debug("[%s] Creating new server using image ID %r and flavor name %r",
-            cloud_handler.name, image_id, flavor_name)
+            resource_handler.name, image_id, flavor_name)
         server = self.conn.servers.create(server_name, image_id, flavor_name,
             security_groups=sec_groups, key_name=key_name, userdata=context)
         log.debug('Reservation: %r, server ID: %r', server, server.id)
         return server
 
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
-                  cloud_handler.name, self.resolved_node_definition['name'])
+                  resource_handler.name, self.resolved_node_definition['name'])
 
-        server = self._start_instance(cloud_handler, self.resolved_node_definition)
-        log.debug("[%s] Done; vm_id = %r", cloud_handler.name, server.id)
+        server = self._start_instance(resource_handler, self.resolved_node_definition)
+        log.debug("[%s] Done; vm_id = %r", resource_handler.name, server.id)
 
         if 'floating_ip' in self.resolved_node_definition:
             floating_ip = self.conn.floating_ips.create()
-            log.debug("[%s] Created floating IP: %r", cloud_handler.name, floating_ip)
+            log.debug("[%s] Created floating IP: %r", resource_handler.name, floating_ip)
             attempts = 0
             while attempts < 10:
                 try:
-                    log.debug("[%s] Adding floating IP to server...", cloud_handler.name)
+                    log.debug("[%s] Adding floating IP to server...", resource_handler.name)
                     server.add_floating_ip(floating_ip)
                 except Exception as e:
                     log.debug(e)
                     time.sleep(1)
                     attempts += 1
                 else:
-                    log.debug("[%s] Added floating IP to server", cloud_handler.name)
+                    log.debug("[%s] Added floating IP to server", resource_handler.name)
                     break
             if attempts == 5:
-                log.error("[%s] Failed to add floating IP to server", cloud_handler.name)
+                log.error("[%s] Failed to add floating IP to server", resource_handler.name)
                 self.conn.floating_ips.delete(floating_ip)
                 raise Exception('Failed to add floating IP')
         return server.id
@@ -143,7 +143,7 @@ class DropNode(Command):
 
     @wet_method()
     @needs_connection
-    def _delete_vms(self, cloud_handler, *vm_ids):
+    def _delete_vms(self, resource_handler, *vm_ids):
         """
         Terminate VM instances.
 
@@ -158,11 +158,11 @@ class DropNode(Command):
         for floating_ip in floating_ips:
             if floating_ip.instance_id == server.id:
                 log.debug("[%s] Removing floating IP %r allocated for the VM",
-                    cloud_handler.name, floating_ip.ip)
+                    resource_handler.name, floating_ip.ip)
                 self.conn.floating_ips.delete(floating_ip)
         self.conn.servers.delete(server)
 
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         """
         Terminate a VM instance.
 
@@ -170,12 +170,12 @@ class DropNode(Command):
         :type instance_data: :ref:`Instance Data <instancedata>`
         """
         instance_id = self.instance_data['instance_id']
-        log.debug("[%s] Dropping node %r", cloud_handler.name,
+        log.debug("[%s] Dropping node %r", resource_handler.name,
                   self.instance_data['node_id'])
 
-        self._delete_vms(cloud_handler, instance_id)
+        self._delete_vms(resource_handler, instance_id)
 
-        log.debug("[%s] Done", cloud_handler.name)
+        log.debug("[%s] Done", resource_handler.name)
 
 class GetState(Command):
     def __init__(self, instance_data):
@@ -184,9 +184,9 @@ class GetState(Command):
 
     @wet_method('ready')
     @needs_connection
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         log.debug("[%s] Acquiring node state %r",
-                  cloud_handler.name, self.instance_data['node_id'])
+                  resource_handler.name, self.instance_data['node_id'])
         server = self.conn.servers.get(self.instance_data['instance_id'])
         inst_state = server.status
         try:
@@ -195,7 +195,7 @@ class GetState(Command):
             raise NotImplementedError('Unknown Nova state', inst_state)
         else:
             log.debug("[%s] Done; nova_state=%r; status=%r",
-                      cloud_handler.name, inst_state, retval)
+                      resource_handler.name, inst_state, retval)
             return retval
 
 class GetIpAddress(Command):
@@ -205,9 +205,9 @@ class GetIpAddress(Command):
 
     @wet_method('127.0.0.1')
     @needs_connection
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         log.debug("[%s] Acquiring IP address for %r",
-                  cloud_handler.name,
+                  resource_handler.name,
                   self.instance_data['node_id'])
         server = self.conn.servers.get(self.instance_data['instance_id'])
         floating_ips = self.conn.floating_ips.list()
@@ -220,10 +220,10 @@ class GetIpAddress(Command):
                 return addre['addr'].encode('latin-1')
         return None
 
-@factory.register(CloudHandler, PROTOCOL_ID)
-class NovaCloudHandler(CloudHandler):
+@factory.register(ResourceHandler, PROTOCOL_ID)
+class NovaResourceHandler(ResourceHandler):
     """ Implementation of the
-    :class:`~occo.cloudhandler.cloudhandler.CloudHandler` class utilizing the
+    :class:`~occo.resourcehandler.resourcehandler.ResourceHandler` class utilizing the
     OpenStack Nova interface.
 
     :param dict target: Definition of the EC2 endpoint. This must contain:
@@ -237,7 +237,7 @@ class NovaCloudHandler(CloudHandler):
         * ``username``: The access key.
         * ``password``: The secret key.
 
-    :param str name: The name of this ``CloudHandler`` instance. If unset,
+    :param str name: The name of this ``ResourceHandler`` instance. If unset,
         ``target['endpoint']`` is used.
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
@@ -248,9 +248,6 @@ class NovaCloudHandler(CloudHandler):
         self.dry_run = dry_run
         self.name = name if name else target['auth_url']
         self.target, self.auth_data, self.auth_type = target, auth_data, auth_type
-        # The following is intentional. It is a constant yet, but maybe it'll
-        # change in the future.
-        self.resource_type = 'vm'
 
     def get_connection(self):
         return setup_connection(self.target, self.auth_data, self.auth_type)

@@ -16,9 +16,8 @@
 import unittest
 from nose.tools import ok_, eq_
 import common
-import occo.plugins.cloudhandler.boto
-import occo.plugins.cloudhandler.dummy
-from occo.cloudhandler import CloudHandler, CloudHandlerProvider
+import occo.plugins.resourcehandler.ec2
+from occo.resourcehandler import ResourceHandler, ResourceHandlerProvider
 import occo.plugins.infraprocessor.basic_infraprocessor
 import occo.infraprocessor as ip
 import occo.infraprocessor.synchronization.primitives as sp
@@ -32,7 +31,7 @@ import yaml
 import logging
 import os, sys
 
-log = logging.getLogger('occo_test.boto_test')
+log = logging.getLogger('occo_test.ec2_test')
 
 DROP_NODES_FILE = 'occo_test/drop_nodes.yaml'
 
@@ -56,7 +55,7 @@ class BotoTest(unittest.TestCase):
             yaml.dump(cleaner.deep_copy(self.cfg)))
 
     def test_full_dryrun(self):
-        self.ch = CloudHandler(self.cfg)
+        self.ch = ResourceHandler(self.cfg)
         with util.global_dry_run():
             nid = self.ch.create_node(cfg.node_defs['node1'])
 
@@ -68,7 +67,7 @@ class BotoTest(unittest.TestCase):
                     self.sc,
                     dsp.DynamicStateProvider(self.sc, self.ch),
                     sp.SynchronizationProvider(),
-                    CloudHandlerProvider(self.ch)
+                    ResourceHandlerProvider(self.ch)
                 ])
 
             try:
@@ -88,7 +87,7 @@ class BotoTest(unittest.TestCase):
 
     @real_resource
     def test_create_node(self):
-        self.ch = CloudHandler(self.cfg)
+        self.ch = ResourceHandler(self.cfg)
         node_def = cfg.node_defs['node_lpds']
         log.debug("node_desc: %r", node_def)
         nid = self.ch.create_node(node_def)
@@ -100,7 +99,7 @@ class BotoTest(unittest.TestCase):
     @real_resource
     def test_create_using_ip(self):
         node_def = cfg.node_defs['node_lpds']
-        self.ch = CloudHandler(self.cfg)
+        self.ch = ResourceHandler(self.cfg)
         self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
         self.uds = UDS.instantiate(protocol='dict')
         self.uds.kvstore.set_item('node_def:test', [node_def])
@@ -109,7 +108,7 @@ class BotoTest(unittest.TestCase):
             self.sc,
             dsp.DynamicStateProvider(self.sc, self.ch),
             sp.SynchronizationProvider(),
-            CloudHandlerProvider(self.ch)
+            ResourceHandlerProvider(self.ch)
         ])
 
         eid = str(uuid.uuid4())
@@ -131,7 +130,7 @@ class BotoTest(unittest.TestCase):
 
     @real_resource
     def test_drop_node(self):
-        self.ch = CloudHandler(self.cfg)
+        self.ch = ResourceHandler(self.cfg)
         remaining = []
         last_exception = None
         for i in self.drop_nodes:
@@ -150,7 +149,7 @@ class BotoTest(unittest.TestCase):
 
     @real_resource
     def test_node_status(self):
-        self.ch = CloudHandler(self.cfg)
+        self.ch = ResourceHandler(self.cfg)
         last_exception = None
 
         self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
@@ -160,7 +159,7 @@ class BotoTest(unittest.TestCase):
             self.sc,
             dsp.DynamicStateProvider(self.sc, self.ch),
             sp.SynchronizationProvider(),
-            CloudHandlerProvider(self.ch)
+            ResourceHandlerProvider(self.ch)
         ])
 
         for i in self.drop_nodes:

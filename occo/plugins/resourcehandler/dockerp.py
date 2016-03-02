@@ -13,7 +13,7 @@
 ### limitations under the License.
 
 """ Docker implementation of the
-:class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
+:class:`~occo.resourcehandler.resourcehandler.ResourceHandler` class.
 
 .. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>, Sandor Acs <acs.sandor@sztaki.mta.hu>
 """
@@ -23,14 +23,14 @@ import docker
 import ast
 import logging
 from occo.util import wet_method, coalesce
-from occo.cloudhandler import CloudHandler, Command
+from occo.resourcehandler import ResourceHandler, Command
 import occo.constants.status as status
 
-__all__ = ['DockerCloudHandler']
+__all__ = ['DockerResourceHandler']
 
 PROTOCOL_ID = 'docker'
 
-log = logging.getLogger('occo.cloudhandler.dockerp')
+log = logging.getLogger('occo.resourcehandler.docker')
 
 class CreateNode(Command):
     def __init__(self, resolved_node_definition):
@@ -44,12 +44,12 @@ class CreateNode(Command):
         self.env = self.resolved_node_definition['attributes']['env']
 
     @wet_method('dummyid')
-    def _start_instance(self, cloud_handler):
+    def _start_instance(self, resource_handler):
         """
         Start the Docker instance.
         """
         log.debug('Starting container')
-        cli = cloud_handler.cli
+        cli = resource_handler.cli
         host_config=cli.create_host_config(network_mode=self.network_mode)
         container = cli.create_container(
             image='{0.image}:{0.tag}'.format(self),
@@ -63,32 +63,32 @@ class CreateNode(Command):
         return str(container)
 
     @wet_method()
-    def _load(self, cloud_handler):
+    def _load(self, resource_handler):
         """
         Load Docker image so it can be instantiated.
         """
         log.info('[%s] Loading Docker image origin=%r image=%r tag=%r',
-                 cloud_handler.name, self.origin, self.image, self.tag)
+                 resource_handler.name, self.origin, self.image, self.tag)
         if self.origin == 'dockerhub':
-            cloud_handler.cli.pull(repository=self.image, tag=self.tag)
+            resource_handler.cli.pull(repository=self.image, tag=self.tag)
         else:
-            cloud_handler.cli.import_image_from_url(
+            resource_handler.cli.import_image_from_url(
                 url=self.origin,
                 repository=self.image,
                 tag=self.tag
             )
 
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         print self.resolved_node_definition
         log.debug("[%s] Creating node: %r",
-              cloud_handler.name, self.resolved_node_definition)
+              resource_handler.name, self.resolved_node_definition)
 
         log.debug("Creating node")
 
-        self._load(cloud_handler)
-        instance_id = self._start_instance(cloud_handler)
+        self._load(resource_handler)
+        instance_id = self._start_instance(resource_handler)
 
-        log.debug("[%s] Done; container_id = %r", cloud_handler.name, instance_id)
+        log.debug("[%s] Done; container_id = %r", resource_handler.name, instance_id)
         return instance_id
 
 class DropNode(Command):
@@ -98,19 +98,19 @@ class DropNode(Command):
         self.instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
 
     @wet_method()
-    def _delete_container(self, cloud_handler, instance_id):
-        log.debug("[%s] Stopping container %r", cloud_handler.name, instance_id)
-        cloud_handler.cli.stop(container=instance_id)
-        log.debug("[%s] Removing container %r", cloud_handler.name, instance_id)
-        cloud_handler.cli.remove_container(container=instance_id)
+    def _delete_container(self, resource_handler, instance_id):
+        log.debug("[%s] Stopping container %r", resource_handler.name, instance_id)
+        resource_handler.cli.stop(container=instance_id)
+        log.debug("[%s] Removing container %r", resource_handler.name, instance_id)
+        resource_handler.cli.remove_container(container=instance_id)
 
-    def perform(self, cloud_handler):
-        log.debug("[%s] Dropping node %r", cloud_handler.name,
+    def perform(self, resource_handler):
+        log.debug("[%s] Dropping node %r", resource_handler.name,
                   self.instance_data['node_id'])
 
-        self._delete_container(cloud_handler, self.instance_id)
+        self._delete_container(resource_handler, self.instance_id)
 
-        log.debug("[%s] Done", cloud_handler.name)
+        log.debug("[%s] Done", resource_handler.name)
 
 class GetState(Command):
     def __init__(self, instance_data):
@@ -119,7 +119,7 @@ class GetState(Command):
         self.instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
 
     @wet_method('running')
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         """
         Return translated status of the container.
 
@@ -127,10 +127,10 @@ class GetState(Command):
         """
 
         instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
-        info = cloud_handler.cli.inspect_container(container=instance_id)
+        info = resource_handler.cli.inspect_container(container=instance_id)
 
         if info['State']['Running']:
-            log.debug("[%s] Done; retval=%r; status=%r",cloud_handler.name,
+            log.debug("[%s] Done; retval=%r; status=%r",resource_handler.name,
                       'Running', status.READY)
             return status.READY
 
@@ -156,12 +156,12 @@ class GetIpAddress(Command):
         self.instance_data = instance_data
 
     @wet_method('127.0.0.1')
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         """
         Return (IPv4) network address of the container.
         """
         instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
-        info = cloud_handler.cli.inspect_container(container=instance_id)
+        info = resource_handler.cli.inspect_container(container=instance_id)
         ip_addresses = []
         for k, v in info['NetworkSettings']['Networks'].iteritems():
             ip_addresses.append(v['IPAddress'])
@@ -173,21 +173,21 @@ class GetAddress(Command):
         self.instance_data = instance_data
 
     @wet_method('127.0.0.1')
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         """
         Return network address of the container.
         """
         instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
-        info = cloud_handler.cli.inspect_container(container=instance_id)
+        info = resource_handler.cli.inspect_container(container=instance_id)
         ip_addresses = []
         for k, v in info['NetworkSettings']['Networks'].iteritems():
             ip_addresses.append(v['IPAddress'])
         return ip_addresses[0]
 
-@factory.register(CloudHandler, PROTOCOL_ID)
-class DockerCloudHandler(CloudHandler):
+@factory.register(ResourceHandler, PROTOCOL_ID)
+class DockerResourceHandler(ResourceHandler):
     """ Implementation of the
-    :class:`~occo.cloudhandler.CloudHandler` class utilizing Docker_.
+    :class:`~occo.resourcehandler.ResourceHandler` class utilizing Docker_.
 
     :param str base_url: Docker socket URL
 

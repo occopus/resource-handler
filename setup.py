@@ -17,25 +17,25 @@ import setuptools
 from pip.req import parse_requirements
 
 setuptools.setup(
-    name='OCCO-CloudHandler',
+    name='OCCO-ResourceHandler',
     version='0.3.0',
     author='MTA SZTAKI',
     author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
         'occo',
         'occo.plugins',
-        'occo.plugins.cloudhandler',
+        'occo.plugins.resourcehandler',
     ],
     py_modules=[
-        'occo.plugins.cloudhandler.nova',
-        'occo.plugins.cloudhandler.cloudbroker',
-        'occo.plugins.cloudhandler.dummy',
-        'occo.plugins.cloudhandler.boto',
-	'occo.plugins.cloudhandler.dockerp',
-	'occo.plugins.cloudhandler.occi'
+        'occo.plugins.resourcehandler.nova',
+        'occo.plugins.resourcehandler.cloudbroker',
+        'occo.plugins.resourcehandler.dummy',
+        'occo.plugins.resourcehandler.boto',
+	'occo.plugins.resourcehandler.dockerp',
+	'occo.plugins.resourcehandler.occi'
     ],
     packages=[
-        'occo.cloudhandler',
+        'occo.resourcehandler',
     ],
     scripts=[],
     url='https://github.com/occopus',

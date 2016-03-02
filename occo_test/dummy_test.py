@@ -16,12 +16,12 @@
 import unittest
 from nose.tools import ok_, eq_
 import common
-from occo.cloudhandler import CloudHandler
+from occo.resourcehandler import ResourceHandler
 
 class DummyTest(unittest.TestCase):
     def setUp(self):
         self.cfg = common.configure()
-        self.ch = CloudHandler(self.cfg.ch_cfgs)
+        self.ch = ResourceHandler(self.cfg.ch_cfgs)
     def test_create_node(self):
         nd = dict()
         nd['node_id'] = 'test_node_id'

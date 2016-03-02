@@ -13,7 +13,7 @@
 ### limitations under the License.
 
 """ Boto EC2 implementation of the
-:class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
+:class:`~occo.resourcehandler.resourcehandler.ResourceHandler` class.
 
 .. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>
 """
@@ -26,14 +26,14 @@ import boto.ec2
 import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce
-from occo.cloudhandler import CloudHandler, Command
+from occo.resourcehandler import ResourceHandler, Command
 import itertools as it
 import logging
 import occo.constants.status as status
 
-__all__ = ['BotoCloudHandler']
+__all__ = ['BotoResourceHandler']
 
-PROTOCOL_ID = 'boto'
+PROTOCOL_ID = 'ec2'
 STATE_MAPPING = {
     'pending'       : status.PENDING,
     'running'       : status.READY,
@@ -43,7 +43,7 @@ STATE_MAPPING = {
     'stopped'       : status.TMP_FAIL,
 }
 
-log = logging.getLogger('occo.cloudhandler.boto')
+log = logging.getLogger('occo.resourcehandler.ec2')
 
 def setup_connection(target, auth_data):
     """
@@ -77,9 +77,9 @@ def needs_connection(f):
     """
     import functools
     @functools.wraps(f)
-    def g(self, cloud_handler, *args, **kwargs):
-        self.conn = cloud_handler.get_connection()
-        return f(self, cloud_handler, *args, **kwargs)
+    def g(self, resource_handler, *args, **kwargs):
+        self.conn = resource_handler.get_connection()
+        return f(self, resource_handler, *args, **kwargs)
 
     return g
 
@@ -90,7 +90,7 @@ class CreateNode(Command):
 
     @wet_method(1)
     @needs_connection
-    def _start_instance(self, cloud_handler):
+    def _start_instance(self, resource_handler):
         """
         Start the VM instance.
 
@@ -112,13 +112,13 @@ class CreateNode(Command):
         vm_id = reservation.instances[0].id
         return vm_id
 
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
-                  cloud_handler.name, self.resolved_node_definition['name'])
+                  resource_handler.name, self.resolved_node_definition['name'])
 
-        vm_id = self._start_instance(cloud_handler)
+        vm_id = self._start_instance(resource_handler)
 
-        log.debug("[%s] Done; vm_id = %r", cloud_handler.name, vm_id)
+        log.debug("[%s] Done; vm_id = %r", resource_handler.name, vm_id)
         return vm_id
 
 class DropNode(Command):
@@ -128,7 +128,7 @@ class DropNode(Command):
 
     @wet_method()
     @needs_connection
-    def _delete_vms(self, cloud_handler, *vm_ids):
+    def _delete_vms(self, resource_handler, *vm_ids):
         """
         Terminate VM instances.
 
@@ -140,7 +140,7 @@ class DropNode(Command):
         """
         self.conn.terminate_instances(instance_ids=vm_ids)
 
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         """
         Terminate a VM instance.
 
@@ -148,12 +148,12 @@ class DropNode(Command):
         :type instance_data: :ref:`Instance Data <instancedata>`
         """
         instance_id = self.instance_data['instance_id']
-        log.debug("[%s] Dropping node %r", cloud_handler.name,
+        log.debug("[%s] Dropping node %r", resource_handler.name,
                   self.instance_data['node_id'])
 
-        self._delete_vms(cloud_handler, instance_id)
+        self._delete_vms(resource_handler, instance_id)
 
-        log.debug("[%s] Done", cloud_handler.name)
+        log.debug("[%s] Done", resource_handler.name)
 
 class GetState(Command):
     def __init__(self, instance_data):
@@ -162,9 +162,9 @@ class GetState(Command):
     
     @wet_method('ready')
     @needs_connection
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         log.debug("[%s] Acquiring node state %r",
-                  cloud_handler.name, self.instance_data['node_id'])
+                  resource_handler.name, self.instance_data['node_id'])
         inst = get_instance(self.conn, self.instance_data['instance_id'])
         inst_state = inst.state
         try:
@@ -173,7 +173,7 @@ class GetState(Command):
             raise NotImplementedError('Unknown EC2 state', inst_state)
         else:
             log.debug("[%s] Done; boto_state=%r; status=%r",
-                      cloud_handler.name, inst_state, retval)
+                      resource_handler.name, inst_state, retval)
             return retval
 
 class GetIpAddress(Command):
@@ -183,9 +183,9 @@ class GetIpAddress(Command):
     
     @wet_method('127.0.0.1')
     @needs_connection
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         log.debug("[%s] Acquiring IP address for %r",
-                  cloud_handler.name,
+                  resource_handler.name,
                   self.instance_data['node_id'])
         inst = get_instance(self.conn, self.instance_data['instance_id'])
         ip_address = None if inst.ip_address is '' else inst.ip_address
@@ -199,9 +199,9 @@ class GetAddress(Command):
     
     @wet_method('127.0.0.1')
     @needs_connection
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         log.debug("[%s] Acquiring address for %r",
-                  cloud_handler.name,
+                  resource_handler.name,
                   self.instance_data['node_id'])
         inst = get_instance(self.conn, self.instance_data['instance_id'])
         public_dns_name = None if inst.public_dns_name is '' else inst.public_dns_name
@@ -211,10 +211,10 @@ class GetAddress(Command):
                         ip_address,
                         private_ip_address)
 
-@factory.register(CloudHandler, PROTOCOL_ID)
-class BotoCloudHandler(CloudHandler):
+@factory.register(ResourceHandler, PROTOCOL_ID)
+class BotoResourceHandler(ResourceHandler):
     """ Implementation of the
-    :class:`~occo.cloudhandler.cloudhandler.CloudHandler` class utilizing the
+    :class:`~occo.resourcehandler.resourcehandler.ResourceHandler` class utilizing the
     Boto_ EC2_ interface.
 
     :param dict target: Definition of the EC2 endpoint. This must contain:
@@ -227,7 +227,7 @@ class BotoCloudHandler(CloudHandler):
         * ``username``: The access key.
         * ``password``: The secret key.
 
-    :param str name: The name of this ``CloudHandler`` instance. If unset,
+    :param str name: The name of this ``ResourceHandler`` instance. If unset,
         ``target['endpoint']`` is used.
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
@@ -240,9 +240,6 @@ class BotoCloudHandler(CloudHandler):
         self.dry_run = dry_run
         self.name = name if name else target['endpoint']
         self.target, self.auth_data = target, auth_data
-        # The following is intentional. It is a constant yet, but maybe it'll
-        # change in the future.
-        self.resource_type = 'vm'
 
     def get_connection(self):
         return setup_connection(self.target, self.auth_data)

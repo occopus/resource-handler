@@ -12,13 +12,13 @@
 ### See the License for the specific language governing permissions and
 ### limitations under the License.
 
-""" Abstract Cloud Handler module for OCCO
+""" Abstract Resource Handler module for OCCO
 
-.. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>
+.. moduleauthor:: Jozsef Kocacs <jozsef.kovacs@sztaki.mta.hu>
 
 """
 
-__all__ = ['CloudHandler', 'CloudHandlerProvider']
+__all__ = ['ResourceHandler', 'ResourceHandlerProvider']
 
 import occo.infobroker as ib
 import occo.util.factory as factory
@@ -26,35 +26,35 @@ import yaml
 import logging
 import time
 
-log = logging.getLogger('occo.cloudhandler')
+log = logging.getLogger('occo.resourcehandler')
 
 class Command(object):
     def __init__(self):
         pass   
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         """Perform the algorithm represented by this command."""
         raise NotImplementedError()
 
-class CloudHandler(factory.MultiBackend):
+class ResourceHandler(factory.MultiBackend):
     """
-    Abstract interface of a Cloud Handler.
+    Abstract interface of a Resource Handler.
 
-    ``CloudHandler``\ s are one-shot objects performing a single operation; no
+    ``ResourceHandler``\ s are one-shot objects performing a single operation; no
     run-time state is retained. This enables the trivial parallelization of
-    performing Cloud Handler instructions.
+    performing Resource Handler instructions.
 
     .. todo:: This class will need to be an RPC subject; therefore we need:
 
         - A stub-skeleton pair
         - Probably the implementation of the Command strategy. But we need to
-          think this through first. (Many methods in the ``CloudHandler``
+          think this through first. (Many methods in the ``ResourceHandler``
           iterface are better supported with the Command strategy: it's much
           more efficient. If we are reasonably sure that we'll only have these
           three methods, we can simply proxy each of them individually.)
 
     """
-    def __init__(self, cloud_cfgs):
-        self.cloud_cfgs = cloud_cfgs
+    def __init__(self, resource_cfgs):
+        self.resource_cfgs = resource_cfgs
 
     def perform(self, instruction):
         raise NotImplementedError()
@@ -84,45 +84,45 @@ class CloudHandler(factory.MultiBackend):
     def cri_get_ip_address(self, instance_data):
         raise NotImplementedError()
 
-    def instantiate_ch(self, data):
+    def instantiate_rh(self, data):
         cfg = self.cloud_cfgs[data['backend_id']]
-        return CloudHandler.instantiate(**cfg)
+        return ResourceHandler.instantiate(**cfg)
 
     def create_node(self, resolved_node_definition):
-        ch = self.instantiate_ch(resolved_node_definition)
-        return ch.cri_create_node(resolved_node_definition).perform(ch)
+        rh = self.instantiate_rh(resolved_node_definition)
+        return rh.cri_create_node(resolved_node_definition).perform(rh)
 
     def drop_node(self, instance_data):
-        ch = self.instantiate_ch(instance_data)
-        return ch.cri_drop_node(instance_data).perform(ch)
+        rh = self.instantiate_rh(instance_data)
+        return rh.cri_drop_node(instance_data).perform(rh)
 
     def get_state(self, instance_data):
-        ch = self.instantiate_ch(instance_data)
-        return ch.cri_get_state(instance_data).perform(ch)
+        rh = self.instantiate_rh(instance_data)
+        return rh.cri_get_state(instance_data).perform(rh)
 
     def get_address(self, instance_data):
-        ch = self.instantiate_ch(instance_data)
-        return ch.cri_get_address(instance_data).perform(ch)
+        rh = self.instantiate_rh(instance_data)
+        return rh.cri_get_address(instance_data).perform(rh)
 
     def get_ip_address(self, instance_data):
-        ch = self.instantiate_ch(instance_data)
-        return ch.cri_get_ip_address(instance_data).perform(ch)
+        rh = self.instantiate_rh(instance_data)
+        return rh.cri_get_ip_address(instance_data).perform(rh)
         
 @ib.provider
-class CloudHandlerProvider(ib.InfoProvider):
-    def __init__(self, cloud_handler, **config):
+class ResourceHandlerProvider(ib.InfoProvider):
+    def __init__(self, resource_handler, **config):
         self.__dict__.update(config)
-        self.cloud_handler = cloud_handler
+        self.resource_handler = resource_handler
 
     @ib.provides('node.resource.state')
     def get_state(self, instance_data):
-        return self.cloud_handler.get_state(instance_data)
+        return self.resource_handler.get_state(instance_data)
 
     @ib.provides('node.resource.ip_address')
     def get_ip_address(self, instance_data):
-        return self.cloud_handler.get_ip_address(instance_data)
+        return self.resource_handler.get_ip_address(instance_data)
 
     @ib.provides('node.resource.address')
     def get_address(self, instance_data):
-        return self.cloud_handler.get_address(instance_data)
+        return self.resource_handler.get_address(instance_data)
 
