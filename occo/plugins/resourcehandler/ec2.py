@@ -18,7 +18,7 @@
 .. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>
 """
 
-# To avoid self-importing *this* boto.py module (we need the "real" one
+# To avoid self-importing *this* ec2.py module (we need the "real" one
 # provided by the boto package).
 from __future__ import absolute_import
 import boto
@@ -31,7 +31,7 @@ import itertools as it
 import logging
 import occo.constants.status as status
 
-__all__ = ['BotoResourceHandler']
+__all__ = ['EC2ResourceHandler']
 
 PROTOCOL_ID = 'ec2'
 STATE_MAPPING = {
@@ -172,7 +172,7 @@ class GetState(Command):
         except KeyError:
             raise NotImplementedError('Unknown EC2 state', inst_state)
         else:
-            log.debug("[%s] Done; boto_state=%r; status=%r",
+            log.debug("[%s] Done; ec2_state=%r; status=%r",
                       resource_handler.name, inst_state, retval)
             return retval
 
