@@ -85,7 +85,7 @@ class ResourceHandler(factory.MultiBackend):
         raise NotImplementedError()
 
     def instantiate_rh(self, data):
-        cfg = self.cloud_cfgs[data['backend_id']]
+        cfg = self.resource_cfgs[data['backend_id']]
         return ResourceHandler.instantiate(**cfg)
 
     def create_node(self, resolved_node_definition):
