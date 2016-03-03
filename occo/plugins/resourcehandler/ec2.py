@@ -45,14 +45,13 @@ STATE_MAPPING = {
 
 log = logging.getLogger('occo.resourcehandler.ec2')
 
-def setup_connection(target, auth_data):
+def setup_connection(endpoint, regionname, auth_data):
     """
     Setup the connection to the EC2 server.
     """
-    endpoint = target['endpoint']
     url = urlparse.urlparse(endpoint)
     region = boto.ec2.regioninfo.RegionInfo(
-        name=target['regionname'], endpoint=url.hostname)
+        name=regionname, endpoint=url.hostname)
     log.debug('Connecting to %r %r as %r',
               endpoint, region, auth_data['username'])
     return boto.connect_ec2(
@@ -97,12 +96,13 @@ class CreateNode(Command):
         :Remark: This is a "wet method", the VM will not be started
             if the instance is in debug mode (``dry_run``).
         """
-        image_id = self.resolved_node_definition['image_id']
-        instance_type = self.resolved_node_definition['instance_type']
-        context = self.resolved_node_definition['context']
-        key_name = self.resolved_node_definition.get('key_name', None)
-        sec_group_ids = self.resolved_node_definition.get('security_group_ids', None)
-        subnet_id = self.resolved_node_definition.get('subnet_id', None)
+	rnd = self.resolved_node_definition
+        image_id = rnd['resource']['image_id']
+        instance_type = rnd['resource']['instance_type']
+        context = rnd['context']
+        key_name = rnd['resource'].get('key_name', None)
+        sec_group_ids = rnd['resource'].get('security_group_ids', None)
+        subnet_id = rnd['resource'].get('subnet_id', None)
         reservation = self.conn.run_instances(image_id=image_id,
                                               instance_type=instance_type,
                                               user_data=context,
@@ -212,15 +212,13 @@ class GetAddress(Command):
                         private_ip_address)
 
 @factory.register(ResourceHandler, PROTOCOL_ID)
-class BotoResourceHandler(ResourceHandler):
+class EC2ResourceHandler(ResourceHandler):
     """ Implementation of the
     :class:`~occo.resourcehandler.resourcehandler.ResourceHandler` class utilizing the
     Boto_ EC2_ interface.
 
-    :param dict target: Definition of the EC2 endpoint. This must contain:
-
-        * ``endpoint``: URL of the interface.
-        * ``regionname``: The name of the EC2 region.
+    :param ``endpoint``: URL of the EC2 interface.
+    :param ``regionname``: The name of the EC2 region.
 
     :param dict auth_data: Authentication infomration for the connection.
 
@@ -228,21 +226,21 @@ class BotoResourceHandler(ResourceHandler):
         * ``password``: The secret key.
 
     :param str name: The name of this ``ResourceHandler`` instance. If unset,
-        ``target['endpoint']`` is used.
+        ``endpoint`` is used.
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
     .. _Boto: https://boto.readthedocs.org/en/latest/
     .. _EC2: http://aws.amazon.com/ec2/
     """
-    def __init__(self, target, auth_data, 
+    def __init__(self, endpoint, regionname, auth_data, 
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
-        self.name = name if name else target['endpoint']
-        self.target, self.auth_data = target, auth_data
+        self.name = name if name else endpoint
+        self.endpoint, self.regionname, self.auth_data = endpoint, regionname, auth_data
 
     def get_connection(self):
-        return setup_connection(self.target, self.auth_data)
+        return setup_connection(self.endpoint, self.regionname, self.auth_data)
 
     def cri_create_node(self, resolved_node_definition):
         return CreateNode(resolved_node_definition)

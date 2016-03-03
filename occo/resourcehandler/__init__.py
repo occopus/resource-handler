@@ -53,8 +53,8 @@ class ResourceHandler(factory.MultiBackend):
           three methods, we can simply proxy each of them individually.)
 
     """
-    def __init__(self, resource_cfgs):
-        self.resource_cfgs = resource_cfgs
+    def __init__(self):
+	return
 
     def perform(self, instruction):
         raise NotImplementedError()
@@ -85,8 +85,8 @@ class ResourceHandler(factory.MultiBackend):
         raise NotImplementedError()
 
     def instantiate_rh(self, data):
-        cfg = self.resource_cfgs[data['backend_id']]
-        return ResourceHandler.instantiate(**cfg)
+	cfg=data['resource']
+        return ResourceHandler.instantiate(protocol=data['resource']['type'],**cfg)
 
     def create_node(self, resolved_node_definition):
         rh = self.instantiate_rh(resolved_node_definition)
