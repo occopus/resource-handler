@@ -79,7 +79,6 @@ class CreateNode(Command):
             )
 
     def perform(self, resource_handler):
-        print self.resolved_node_definition
         log.debug("[%s] Creating node: %r",
               resource_handler.name, self.resolved_node_definition)
 
@@ -189,15 +188,16 @@ class DockerResourceHandler(ResourceHandler):
     """ Implementation of the
     :class:`~occo.resourcehandler.ResourceHandler` class utilizing Docker_.
 
-    :param str base_url: Docker socket URL
+    :param str endpoint: Docker socket URL
 
     .. _Docker: https://www.docker.com/
     """
-    def __init__(self, name, base_url, dry_run, **config):
+    def __init__(self, endpoint, 
+                 name=None, dry_run=False,
+                 **config):
         self.dry_run = dry_run
-        self.name = name
-        self.base_url = base_url
-        self.cli = docker.Client(base_url=base_url)
+        self.name = name if name else endpoint
+        self.cli = docker.Client(endpoint)
 
     def cri_create_node(self, resolved_node_definition):
         return CreateNode(resolved_node_definition)
