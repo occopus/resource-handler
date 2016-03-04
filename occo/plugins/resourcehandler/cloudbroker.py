@@ -52,7 +52,7 @@ def get_instance(resource_handler, jobid):
     attempt = 0
     stime = 1
     while attempt < 3:
-        r = requests.get(resource_handler.target + '/instances.xml',
+        r = requests.get(resource_handler.endpoint + '/instances.xml',
                 auth=get_auth(resource_handler.auth_data), params={'job_id': jobid})
         if (r.status_code != 200):
             return None
@@ -81,7 +81,7 @@ class CreateNode(Command):
         """Get the ID of the data file type 'input' from CloudBroker."""
         log.debug("[%s] Determining ID of input data type...", resource_handler.name)
         if self.input_type_id == None:
-            dtypes = requests.get(resource_handler.target + '/data_types.xml',
+            dtypes = requests.get(resource_handler.endpoint + '/data_types.xml',
                 auth=get_auth(resource_handler.auth_data))
             data_types = ET.fromstring(dtypes.text)
             for data_type in data_types.findall('data-type'):
@@ -104,7 +104,7 @@ class CreateNode(Command):
         log.debug("[%s] Uploading file %s with content...", resource_handler.name, filename)
         files = {'data': (filename, content)}
         payload = {'job_id': job_id, 'archive': 'false', 'data_type_id': self.input_type_id}
-        req = requests.post(resource_handler.target + '/data_files.xml',
+        req = requests.post(resource_handler.endpoint + '/data_files.xml',
             auth=get_auth(resource_handler.auth_data), data=payload, files=files)
 
     def _upload_file_with_location(self, resource_handler, job_id, filename, location):
@@ -118,7 +118,7 @@ class CreateNode(Command):
         log.debug("[%s] Uploading file %s with file from path...", resource_handler.name, filename)
         files = {'data': (filename, open(location, 'rb'))}
         payload = {'job_id': job_id, 'archive': 'false', 'data_type_id': self.input_type_id}
-        req = requests.post(resource_handler.target + '/data_files.xml',
+        req = requests.post(resource_handler.endpoint + '/data_files.xml',
             auth=get_auth(resource_handler.auth_data), data=payload, files=files)
 
     def _handle_file(self, resource_handler, job_id, file_info):
@@ -168,7 +168,7 @@ class CreateNode(Command):
         itid.text = instance_type_id
         prtag = SubElement(jobxml, 'permanently-running')
         prtag.text = 'true'
-        r = requests.post(resource_handler.target + '/jobs.xml', tostring(jobxml),
+        r = requests.post(resource_handler.endpoint + '/jobs.xml', tostring(jobxml),
             auth=get_auth(resource_handler.auth_data),
             headers={'Content-Type': 'application/xml'})
         if (r.status_code == 201):
@@ -179,10 +179,10 @@ class CreateNode(Command):
             for file_info in files:
                 self._handle_file(resource_handler, jobid, file_info)
             log.debug("[%s] Submitting CloudBroker job...", resource_handler.name)
-            rsubmit = requests.put(resource_handler.target + '/jobs/' +
+            rsubmit = requests.put(resource_handler.endpoint + '/jobs/' +
                 jobid + '/submit.xml', auth=get_auth(resource_handler.auth_data))
             if (rsubmit.status_code != 200):
-                rdelete = requests.delete(resource_handler.target + '/jobs/' +
+                rdelete = requests.delete(resource_handler.endpoint + '/jobs/' +
                     jobid + '.xml', auth=get_auth(resource_handler.auth_data))
                 jobid = None
             log.debug("[%s] CloudBroker job submitted!", resource_handler.name)
@@ -193,7 +193,7 @@ class CreateNode(Command):
     def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
                 resource_handler.name, self.resolved_node_definition['name'])
-        attributes = self.resolved_node_definition['attributes']
+        attributes = self.resolved_node_definition['resource']['attributes']
         software_id = attributes['software_id']
         executable_id = attributes['executable_id']
         resource_id = attributes['resource_id']
@@ -228,7 +228,7 @@ class DropNode(Command):
             if the instance is in debug mode (``dry_run``).
         """
         for job_id in job_ids:
-            r = requests.put(resource_handler.target + '/jobs/' + job_id + '/stop',
+            r = requests.put(resource_handler.endpoint + '/jobs/' + job_id + '/stop',
                 auth=get_auth(resource_handler.auth_data))
 
     def perform(self, resource_handler):
@@ -253,7 +253,7 @@ class GetState(Command):
 
     @wet_method(status.READY)
     def perform(self, resource_handler):
-        r = requests.get(resource_handler.target + '/jobs/' +
+        r = requests.get(resource_handler.endpoint + '/jobs/' +
                 self.instance_data['instance_id'] + '.xml',
                 auth=get_auth(resource_handler.auth_data))
         if (r.status_code != 200):
@@ -313,25 +313,25 @@ class CloudBrokerResourceHandler(ResourceHandler):
     :class:`~occo.resourcehandler.resourcehandler.ResourceHandler` class utilizing the
     CloudBroker_ RESTful_ interface.
 
-    :param str target: Definition of the CloudBroker service URL.
+    :param str endpoint: Definition of the CloudBroker service URL.
     :param dict auth_data: Authentication infomration for the connection.
 
         * ``email``: The e-mail address used to log in.
         * ``password``: The password belonging to the e-mail address.
 
     :param str name: The name of this ``ResourceHandler`` instance. If unset,
-        ``target['endpoint']`` is used.
+        ``endpoint`` is used.
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
     .. _CloudBroker: http://cloudbroker.com/
     .. _RESTful: https://en.wikipedia.org/wiki/Representational_state_transfer
     """
-    def __init__(self, target, auth_data,
+    def __init__(self, endpoint, auth_data,
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
-        self.name = name if name else target['endpoint']
-        self.target = target if not dry_run else None
+        self.name = name if name else endpoint
+        self.endpoint = endpoint if not dry_run else None
         self.auth_data = auth_data if not dry_run else None
 
     def cri_create_node(self, resolved_node_definition):
