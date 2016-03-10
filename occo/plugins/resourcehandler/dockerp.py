@@ -36,12 +36,12 @@ class CreateNode(Command):
     def __init__(self, resolved_node_definition):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
-        self.origin = self.resolved_node_definition['attributes']['origin']
-        self.network_mode = self.resolved_node_definition['attributes']['network_mode']
-        self.image = self.resolved_node_definition['attributes']['image']
-        self.tag = self.resolved_node_definition['attributes']['tag']
-        self.command = self.resolved_node_definition['attributes']['command']
-        self.env = self.resolved_node_definition['attributes']['env']
+        self.origin = self.resolved_node_definition['resource']['origin']
+        self.network_mode = self.resolved_node_definition['resource']['network_mode']
+        self.image = self.resolved_node_definition['resource']['image']
+        self.tag = self.resolved_node_definition['resource']['tag']
+        self.command = self.resolved_node_definition['resource']['command']
+        self.env = self.resolved_node_definition['resource']['env']
 
     @wet_method('dummyid')
     def _start_instance(self, resource_handler):
