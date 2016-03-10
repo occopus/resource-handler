@@ -99,7 +99,7 @@ class CreateNode(Command):
 	rnd = self.resolved_node_definition
         image_id = rnd['resource']['image_id']
         instance_type = rnd['resource']['instance_type']
-        context = rnd['context']
+        context = rnd.get('context',None)
         key_name = rnd['resource'].get('key_name', None)
         sec_group_ids = rnd['resource'].get('security_group_ids', None)
         subnet_id = rnd['resource'].get('subnet_id', None)
