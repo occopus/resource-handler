@@ -86,7 +86,11 @@ class ResourceHandler(factory.MultiBackend):
 
     def instantiate_rh(self, data):
 	cfg=data['resource']
-        return ResourceHandler.instantiate(protocol=data['resource']['type'],**cfg)
+        auth_data = ib.real_main_info_broker.get('backends.auth_data',"resource",cfg)
+        return ResourceHandler.instantiate(\
+               protocol=data['resource']['type'],\
+               auth_data=auth_data,\
+               **cfg)
 
     def create_node(self, resolved_node_definition):
         rh = self.instantiate_rh(resolved_node_definition)
