@@ -53,10 +53,10 @@ def setup_connection(endpoint, regionname, auth_data):
     region = boto.ec2.regioninfo.RegionInfo(
         name=regionname, endpoint=url.hostname)
     log.debug('Connecting to %r %r as %r',
-              endpoint, region, auth_data['username'])
+              endpoint, region, auth_data['accesskey'])
     return boto.connect_ec2(
-        aws_access_key_id=auth_data['username'],
-        aws_secret_access_key=auth_data['password'],
+        aws_access_key_id=auth_data['accesskey'],
+        aws_secret_access_key=auth_data['secretkey'],
         is_secure=(url.scheme == 'https'),
         region=region,
         port=url.port,
@@ -222,8 +222,8 @@ class EC2ResourceHandler(ResourceHandler):
 
     :param dict auth_data: Authentication infomration for the connection.
 
-        * ``username``: The access key.
-        * ``password``: The secret key.
+        * ``accesskey``: The access key.
+        * ``secretkey``: The secret key.
 
     :param str name: The name of this ``ResourceHandler`` instance. If unset,
         ``endpoint`` is used.
@@ -237,7 +237,9 @@ class EC2ResourceHandler(ResourceHandler):
                  **config):
         self.dry_run = dry_run
         self.name = name if name else endpoint
-        self.endpoint, self.regionname, self.auth_data = endpoint, regionname, auth_data
+        self.endpoint = endpoint
+        self.regionname = regionname
+        self.auth_data = auth_data
 
     def get_connection(self):
         return setup_connection(self.endpoint, self.regionname, self.auth_data)
