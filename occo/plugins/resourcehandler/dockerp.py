@@ -40,8 +40,14 @@ class CreateNode(Command):
         self.network_mode = self.resolved_node_definition['resource']['network_mode']
         self.image = self.resolved_node_definition['resource']['image']
         self.tag = self.resolved_node_definition['resource']['tag']
-        self.command = self.resolved_node_definition['resource']['command']
-        self.env = self.resolved_node_definition['resource']['env']
+
+        self.command = self.resolved_node_definition.get('attributes',dict()).get('command',None)
+        self.env = self.resolved_node_definition.get('attributes',dict()).get('env',None)
+        if not self.command or not self.env:
+            raise Exception('Missing keys! Docker requires \'command\',\'env\' keywords to be specified under \'contextualisation\' section in node definition!')
+
+        log.info('Command: %s',self.command)
+        log.info('Env: %s',self.env)
 
     @wet_method('dummyid')
     def _start_instance(self, resource_handler):
