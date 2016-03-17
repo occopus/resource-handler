@@ -46,9 +46,6 @@ class CreateNode(Command):
         if not self.command or not self.env:
             raise Exception('Missing keys! Docker requires \'command\',\'env\' keywords to be specified under \'contextualisation\' section in node definition!')
 
-        log.info('Command: %s',self.command)
-        log.info('Env: %s',self.env)
-
     @wet_method('dummyid')
     def _start_instance(self, resource_handler):
         """
