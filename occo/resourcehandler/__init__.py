@@ -35,6 +35,29 @@ class Command(object):
         """Perform the algorithm represented by this command."""
         raise NotImplementedError()
 
+class RHSchemaChecker(factory.MultiBackend):
+    def __init__(self):
+        return
+
+    def perform_check(self, data):
+        raise NotImplementedError()
+
+    def check_required_keys(self, data, req_keys):
+        missing_keys = list()
+        for rkey in req_keys:
+            if rkey not in data:
+                print "ERROR: missing key \"%s\" in resource_handler configuration" % rkey
+                missing_keys.append(rkey)
+        return missing_keys
+    
+    def check_invalid_keys(self, data, valid_keys):
+        invalid_keys = list()
+        for key in data:
+            if key not in valid_keys:
+                print "ERROR: invalid key \"%s\" in resource_handler configuration" % key
+                invalid_keys.append(key)
+        return invalid_keys
+
 class ResourceHandler(factory.MultiBackend):
     """
     Abstract interface of a Resource Handler.
@@ -42,16 +65,6 @@ class ResourceHandler(factory.MultiBackend):
     ``ResourceHandler``\ s are one-shot objects performing a single operation; no
     run-time state is retained. This enables the trivial parallelization of
     performing Resource Handler instructions.
-
-    .. todo:: This class will need to be an RPC subject; therefore we need:
-
-        - A stub-skeleton pair
-        - Probably the implementation of the Command strategy. But we need to
-          think this through first. (Many methods in the ``ResourceHandler``
-          iterface are better supported with the Command strategy: it's much
-          more efficient. If we are reasonably sure that we'll only have these
-          three methods, we can simply proxy each of them individually.)
-
     """
     def __init__(self):
 	return
