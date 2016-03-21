@@ -101,7 +101,7 @@ class CreateNode(Command):
         :param str filename: The name of the DataFile.
         :param str content: The content to upload.
         """
-        log.debug("[%s] Uploading file %s with content...", resource_handler.name, filename)
+        log.info("[%s] Uploading file %s with content...", resource_handler.name, filename)
         files = {'data': (filename, content)}
         payload = {'job_id': job_id, 'archive': 'false', 'data_type_id': self.input_type_id}
         req = requests.post(resource_handler.endpoint + '/data_files.xml',
@@ -115,7 +115,7 @@ class CreateNode(Command):
         :param str filename: The name of the DataFile.
         :param str location: The path of the file to upload.
         """
-        log.debug("[%s] Uploading file %s with file from path...", resource_handler.name, filename)
+        log.info("[%s] Uploading file %s with file from path...", resource_handler.name, filename)
         files = {'data': (filename, open(location, 'rb'))}
         payload = {'job_id': job_id, 'archive': 'false', 'data_type_id': self.input_type_id}
         req = requests.post(resource_handler.endpoint + '/data_files.xml',
