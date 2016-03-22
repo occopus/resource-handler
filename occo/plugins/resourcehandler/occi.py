@@ -43,11 +43,11 @@ STATE_MAPPING = {
 
 log = logging.getLogger('occo.resourcehandler.nova')
 
-def execute_command(target, auth_data, *args, **kwargs):
+def execute_command(endpoint, auth_data, *args, **kwargs):
     """
     Execute a custom command towards the target.
     """
-    cmd = ["occi", "-X", "-n", "x509", "-x", auth_data, "-e", target['endpoint']]
+    cmd = ["occi", "-X", "-n", "x509", "-x", auth_data, "-e", endpoint]
     cmd.extend(args)
     #log.debug("Command is: %r", cmd)
     ret, out, err = basic_run_process(" ".join(cmd), input_data=kwargs.get('stdin'))
@@ -77,12 +77,12 @@ class CreateNode(Command):
         :Remark: This is a "wet method", the VM will not be started
             if the instance is in debug mode (``dry_run``).
         """
-        os_tpl = node_def['os_tpl']
-        resource_tpl = node_def['resource_tpl']
+        os_tpl = node_def['resource']['os_tpl']
+        resource_tpl = node_def['resource']['resource_tpl']
         context = node_def['context']
         log.debug("[%s] Creating new server using OS TPL %r and RESOURCE TPL %r",
             resource_handler.name, os_tpl, resource_tpl)
-        server = execute_command(resource_handler.target, resource_handler.auth_data, "-a",
+        server = execute_command(resource_handler.endpoint, resource_handler.auth_data, "-a",
             "create", "-r", "compute", "-M", os_tpl, "-M", resource_tpl, "-t",
             "occi.core.title=OCCO_OCCI_VM", "-T", "user_data=file:///dev/stdin",
             stdin=context).splitlines()
@@ -98,20 +98,20 @@ class CreateNode(Command):
         status = 'inactive'
         while status != 'active':
             time.sleep(10)
-            description = execute_command(resource_handler.target, resource_handler.auth_data, "-a", "describe",
-                "-r", server, "-o", "json")
+            description = execute_command(resource_handler.endpoint, resource_handler.auth_data,
+                                          "-a", "describe", "-r", server, "-o", "json")
             djson = json.loads(description)[0]
             status = djson['attributes']['occi']['compute']['state']
             log.debug("[%s] Status of VM %s is: %s", resource_handler.name, server, status)
 
-        if 'link' in self.resolved_node_definition:
-            for link in self.resolved_node_definition.get('link'):
+        if 'link' in self.resolved_node_definition['resource']:
+            for link in self.resolved_node_definition.get('resource',dict()).get('link',None):
                 attempts = 0
                 while attempts < 10:
                     try:
                         log.debug("[%s] Adding link %s to server...", resource_handler.name, link)
-                        linked = execute_command(resource_handler.target, resource_handler.auth_data, "-a", "link", "-r", server,
-                            "-j", link)
+                        linked = execute_command(resource_handler.endpoint, resource_handler.auth_data,
+                                 "-a", "link", "-r", server, "-j", link)
                     except Exception as e:
                         log.debug(e)
                         time.sleep(1)
@@ -141,7 +141,8 @@ class DropNode(Command):
             if the instance is in debug mode (``dry_run``).
         """
         for server in vm_ids:
-            res = execute_command(resource_handler.target, resource_handler.auth_data, "-a", "delete", "-r", server)
+            res = execute_command(resource_handler.endpoint, resource_handler.auth_data, 
+                                  "-a", "delete", "-r", server)
 
     def perform(self, resource_handler):
         """
@@ -167,8 +168,8 @@ class GetState(Command):
     def perform(self, resource_handler):
         log.debug("[%s] Acquiring node state %r",
                   resource_handler.name, self.instance_data['node_id'])
-        description = execute_command(resource_handler.target, resource_handler.auth_data, "-a", "describe",
-            "-r", self.instance_data['instance_id'], "-o", "json")
+        description = execute_command(resource_handler.endpoint, resource_handler.auth_data, 
+                                      "-a", "describe","-r", self.instance_data['instance_id'], "-o", "json")
         djson = json.loads(description)[0]
         inst_state = djson['attributes']['occi']['compute']['state']
         try:
@@ -190,8 +191,8 @@ class GetIpAddress(Command):
         log.debug("[%s] Acquiring IP address for %r",
                   resource_handler.name,
                   self.instance_data['node_id'])
-        description = execute_command(resource_handler.target, resource_handler.auth_data, "-a", "describe",
-            "-r", self.instance_data['instance_id'], "-o", "json")
+        description = execute_command(resource_handler.endpoint, resource_handler.auth_data, 
+                                      "-a", "describe","-r", self.instance_data['instance_id'], "-o", "json")
         djson = json.loads(description)
         for link in djson[0]['links']:
             ltype = link['kind']
@@ -223,15 +224,15 @@ class OCCIResourceHandler(ResourceHandler):
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
     """
-    def __init__(self, target, auth_data,
+    def __init__(self, endpoint, auth_data,
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
-        self.name = name if name else target['auth_url']
-        self.target, self.auth_data = target, auth_data
+        self.name = name if name else endpoint
+        self.endpoint, self.auth_data = endpoint, auth_data
 
     def get_connection(self):
-        return setup_connection(self.target, self.auth_data, self.auth_type)
+        return setup_connection(self.endpoint, self.auth_data, self.auth_type)
 
     def cri_create_node(self, resolved_node_definition):
         return CreateNode(resolved_node_definition)
