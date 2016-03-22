@@ -21,7 +21,7 @@ from occo.resourcehandler import ResourceHandler, ResourceHandlerProvider
 import occo.plugins.infraprocessor.basic_infraprocessor
 import occo.infraprocessor as ip
 import occo.infraprocessor.synchronization.primitives as sp
-import occo.servicecomposer as sc
+import occo.configmanager as sc
 import occo.infobroker as ib
 import occo.infobroker.dynamic_state_provider as dsp 
 from occo.infobroker.uds import UDS
@@ -59,7 +59,7 @@ class BotoTest(unittest.TestCase):
         with util.global_dry_run():
             nid = self.ch.create_node(cfg.node_defs['node1'])
 
-            self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
+            self.sc = sc.ConfigManager.instantiate(protocol='dummy')
             self.uds = UDS.instantiate(protocol='dict')
             mib = ib.real_main_info_broker = \
                 ib.InfoRouter(sub_providers=[
@@ -100,7 +100,7 @@ class BotoTest(unittest.TestCase):
     def test_create_using_ip(self):
         node_def = cfg.node_defs['node_lpds']
         self.ch = ResourceHandler(self.cfg)
-        self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
+        self.sc = sc.ConfigManager.instantiate(protocol='dummy')
         self.uds = UDS.instantiate(protocol='dict')
         self.uds.kvstore.set_item('node_def:test', [node_def])
         mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
@@ -152,7 +152,7 @@ class BotoTest(unittest.TestCase):
         self.ch = ResourceHandler(self.cfg)
         last_exception = None
 
-        self.sc = sc.ServiceComposer.instantiate(protocol='dummy')
+        self.sc = sc.ConfigManager.instantiate(protocol='dummy')
         self.uds = UDS.instantiate(protocol='dict')
         mib = ib.InfoRouter(main_info_broker=True, sub_providers=[
             self.uds,
