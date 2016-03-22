@@ -194,12 +194,12 @@ class CreateNode(Command):
     def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
                 resource_handler.name, self.resolved_node_definition['name'])
-        attributes = self.resolved_node_definition['resource']['attributes']
-        software_id = attributes['software_id']
-        executable_id = attributes['executable_id']
-        resource_id = attributes['resource_id']
-        region_id = attributes['region_id']
-        instance_type_id = attributes['instance_type_id']
+        resource = self.resolved_node_definition['resource']
+        software_id = resource['software_id']
+        executable_id = resource['executable_id']
+        resource_id = resource['resource_id']
+        region_id = resource['region_id']
+        instance_type_id = resource['instance_type_id']
         files = []
         if 'template_files' in self.resolved_node_definition:
             files += self.resolved_node_definition['template_files']
@@ -356,7 +356,7 @@ class CloudBrokerResourceHandler(ResourceHandler):
 @factory.register(RHSchemaChecker, PROTOCOL_ID)
 class CloudbrokerSchemaChecker(RHSchemaChecker):
     def __init__(self):
-        self.req_keys = ["type", "endpoint", "attributes"]
+        self.req_keys = ["type", "endpoint", "region_id", "resource_id", "software_id", "instance_type_id", "executable_id" ]
         self.opt_keys = []
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
