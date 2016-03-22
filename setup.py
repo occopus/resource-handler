@@ -31,7 +31,7 @@ setuptools.setup(
         'occo.plugins.resourcehandler.cloudbroker',
         'occo.plugins.resourcehandler.dummy',
         'occo.plugins.resourcehandler.boto',
-	'occo.plugins.resourcehandler.dockerp',
+	'occo.plugins.resourcehandler.docker',
 	'occo.plugins.resourcehandler.occi'
     ],
     packages=[
