@@ -26,10 +26,11 @@ import novaclient.auth_plugin
 import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce
-from occo.resourcehandler import ResourceHandler, Command
+from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
 import itertools as it
 import logging
 import occo.constants.status as status
+from occo.exceptions import SchemaError
 
 __all__ = ['NovaResourceHandler']
 
@@ -269,3 +270,22 @@ class NovaResourceHandler(ResourceHandler):
 
     def perform(self, instruction):
         instruction.perform(self)
+
+@factory.register(RHSchemaChecker, PROTOCOL_ID)
+class NovaSchemaChecker(RHSchemaChecker):
+    def __init__(self):
+#        super(__init__(), self)
+        self.req_keys = ["type", "endpoint"]
+        self.opt_keys = []
+    def perform_check(self, data):
+        missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
+        if missing_keys:
+            msg = "missing required keys: " + ', '.join(str(key) for key in missing_keys)
+            raise SchemaError(msg)
+        valid_keys = self.req_keys + self.opt_keys
+        invalid_keys = RHSchemaChecker.get_invalid_keys(self, data, valid_keys)
+        if invalid_keys:
+            msg = "invalid keys found: " + ', '.join(str(key) for key in invalid_keys)
+            raise SchemaError(msg)
+        return True
+
