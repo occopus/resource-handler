@@ -68,7 +68,6 @@ class CreateNode(Command):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
 
-    @wet_method(1)
     def _start_instance(self, resource_handler, node_def):
         """
         Start the VM instance.
@@ -89,6 +88,8 @@ class CreateNode(Command):
             stdin=context).splitlines()
         return server[0]
 
+
+    @wet_method(1)
     def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
                   resource_handler.name, self.resolved_node_definition['name'])
