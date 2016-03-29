@@ -47,7 +47,7 @@ class CreateNode(Command):
         if not self.command or not self.env:
             raise Exception('Missing keys! Docker requires \'command\',\'env\' keywords to be specified under \'contextualisation\' section in node definition!')
 
-    @wet_method('dummyid')
+    @wet_method('1')
     def _start_instance(self, resource_handler):
         """
         Start the Docker instance.
@@ -98,19 +98,19 @@ class DropNode(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
         self.instance_data = instance_data
-        self.instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
 
-    @wet_method()
     def _delete_container(self, resource_handler, instance_id):
         log.debug("[%s] Stopping container %r", resource_handler.name, instance_id)
         resource_handler.cli.stop(container=instance_id)
         log.debug("[%s] Removing container %r", resource_handler.name, instance_id)
         resource_handler.cli.remove_container(container=instance_id)
 
+    @wet_method()
     def perform(self, resource_handler):
         log.debug("[%s] Dropping node %r", resource_handler.name,
                   self.instance_data['node_id'])
 
+        self.instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
         self._delete_container(resource_handler, self.instance_id)
 
         log.debug("[%s] Done", resource_handler.name)
@@ -119,9 +119,8 @@ class GetState(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
         self.instance_data = instance_data
-        self.instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
 
-    @wet_method('running')
+    @wet_method('ready')
     def perform(self, resource_handler):
         """
         Return translated status of the container.
