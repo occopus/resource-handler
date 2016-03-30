@@ -260,7 +260,7 @@ class OCCIResourceHandler(ResourceHandler):
 class OcciSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "os_tpl", "resource_tpl"]
-        self.opt_keys = ["link", "public_key"]
+        self.opt_keys = ["link", "public_key", "name"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:

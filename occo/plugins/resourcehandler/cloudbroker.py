@@ -357,7 +357,7 @@ class CloudBrokerResourceHandler(ResourceHandler):
 class CloudbrokerSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "region_id", "resource_id", "software_id", "instance_type_id", "executable_id" ]
-        self.opt_keys = []
+        self.opt_keys = ["name"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:

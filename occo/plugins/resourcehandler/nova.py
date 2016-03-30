@@ -275,7 +275,7 @@ class NovaResourceHandler(ResourceHandler):
 class NovaSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "tenant_name", "image_id", "flavor_name"]
-        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip"]
+        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip","name"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:

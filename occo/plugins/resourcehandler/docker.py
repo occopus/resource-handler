@@ -223,9 +223,8 @@ class DockerResourceHandler(ResourceHandler):
 @factory.register(RHSchemaChecker, PROTOCOL_ID)
 class DockerSchemaChecker(RHSchemaChecker):
     def __init__(self):
-#        super(__init__(), self)
         self.req_keys = ["type", "endpoint", "origin", "network_mode", "image", "tag"]
-        self.opt_keys = []
+        self.opt_keys = ["name"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
