@@ -48,7 +48,7 @@ def execute_command(endpoint, auth_data, *args, **kwargs):
     """
     Execute a custom command towards the target.
     """
-    cmd = ["occi", "-X", "-n", "x509", "-x", auth_data, "-e", endpoint]
+    cmd = ["occi", "-X", "-n", "x509", "-x", auth_data['proxy'], "-e", endpoint]
     cmd.extend(args)
     #log.debug("Command is: %r", cmd)
     ret, out, err = basic_run_process(" ".join(cmd), input_data=kwargs.get('stdin'))
@@ -80,12 +80,14 @@ class CreateNode(Command):
         os_tpl = node_def['resource']['os_tpl']
         resource_tpl = node_def['resource']['resource_tpl']
         context = node_def['context']
+        public_key = node_def['resource'].get('public_key',None)
         log.debug("[%s] Creating new server using OS TPL %r and RESOURCE TPL %r",
             resource_handler.name, os_tpl, resource_tpl)
+        keyfile = "--context public_key=file://"+public_key if public_key else ""
         server = execute_command(resource_handler.endpoint, resource_handler.auth_data, "-a",
             "create", "-r", "compute", "-M", os_tpl, "-M", resource_tpl, "-t",
             "occi.core.title=OCCO_OCCI_VM", "-T", "user_data=file:///dev/stdin",
-            stdin=context).splitlines()
+            keyfile, stdin=context).splitlines()
         return server[0]
 
 
@@ -258,7 +260,7 @@ class OCCIResourceHandler(ResourceHandler):
 class OcciSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "os_tpl", "resource_tpl"]
-        self.opt_keys = ["link"]
+        self.opt_keys = ["link", "public_key"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
