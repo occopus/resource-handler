@@ -48,21 +48,19 @@ STATE_MAPPING = {
 
 log = logging.getLogger('occo.resourcehandler.nova')
 
-def setup_connection(target, auth_data, auth_type):
+def setup_connection(endpoint, tenant_name, auth_data):
     """
     Setup the connection to the Nova endpoint.
     """
-    auth_url = target['auth_url']
-    tenant_name = target['tenant_name']
-    if auth_type is None:
+    if auth_data.get('type',None) is None:
         user = auth_data['username']
         password = auth_data['password']
         nt = client.Client('2.0', user, password, tenant_name, auth_url)
-    elif auth_type == 'voms':
+    elif auth_data.get('type',None) == 'voms':
         novaclient.auth_plugin.discover_auth_systems()
-        auth_plugin = novaclient.auth_plugin.load_plugin(auth_type)
-        auth_plugin.opts["x509_user_proxy"] = auth_data
-        nt = novaclient.client.Client('2.0', None, None, tenant_name, auth_url, auth_plugin=auth_plugin, auth_system=auth_type)
+        auth_plugin = novaclient.auth_plugin.load_plugin('voms')
+        auth_plugin.opts["x509_user_proxy"] = auth_data['proxy']
+        nt = novaclient.client.Client('2.0', None, None, tenant_name, endpoint, auth_plugin=auth_plugin, auth_system='voms')
     return nt
 
 def needs_connection(f):
@@ -96,12 +94,12 @@ class CreateNode(Command):
         :Remark: This is a "wet method", the VM will not be started
             if the instance is in debug mode (``dry_run``).
         """
-        image_id = node_def['image_id']
-        flavor_name = node_def['flavor_name']
+        image_id = node_def['resource']['image_id']
+        flavor_name = node_def['resource']['flavor_name']
         context = node_def['context']
-        sec_groups = node_def.get('security_groups', None)
-        key_name = node_def.get('key_name', None)
-        server_name = str(uuid.uuid4())
+        sec_groups = node_def['resource'].get('security_groups', None)
+        key_name = node_def['resource'].get('key_name', None)
+        server_name = node_def['resource'].get('server_name',str(uuid.uuid4()))
         log.debug("[%s] Creating new server using image ID %r and flavor name %r",
             resource_handler.name, image_id, flavor_name)
         server = self.conn.servers.create(server_name, image_id, flavor_name,
@@ -116,7 +114,7 @@ class CreateNode(Command):
         server = self._start_instance(resource_handler, self.resolved_node_definition)
         log.debug("[%s] Done; vm_id = %r", resource_handler.name, server.id)
 
-        if 'floating_ip' in self.resolved_node_definition:
+        if 'floating_ip' in self.resolved_node_definition['resource']:
             floating_ip = self.conn.floating_ips.create()
             log.debug("[%s] Created floating IP: %r", resource_handler.name, floating_ip)
             attempts = 0
@@ -243,15 +241,17 @@ class NovaResourceHandler(ResourceHandler):
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
     """
-    def __init__(self, target, auth_type, auth_data,
+    def __init__(self, endpoint, tenant_name, auth_data,
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
-        self.name = name if name else target['auth_url']
-        self.target, self.auth_data, self.auth_type = target, auth_data, auth_type
+        self.name = name if name else endpoint
+        self.endpoint = endpoint
+        self.tenant_name = tenant_name
+        self.auth_data = auth_data
 
     def get_connection(self):
-        return setup_connection(self.target, self.auth_data, self.auth_type)
+        return setup_connection(self.endpoint, self.tenant_name, self.auth_data)
 
     def cri_create_node(self, resolved_node_definition):
         return CreateNode(resolved_node_definition)
@@ -275,7 +275,7 @@ class NovaResourceHandler(ResourceHandler):
 class NovaSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "tenant_name", "image_id", "flavor_name"]
-        self.opt_keys = ["key_name", "security_groups", "floating_ip"]
+        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
