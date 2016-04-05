@@ -12,6 +12,8 @@ if [ -d wheelhouse ]; then
     fi
 fi
 
+rm -rf $PDIR
+mkdir -p wheelhouse
 virtualenv --no-site-packages $PDIR
 source $PDIR/bin/activate
 pip install --upgrade pip

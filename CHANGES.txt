@@ -1,4 +1,16 @@
 
+v1.0 - April 2016
+- Fix network issue in docker plugin
+- Rename cloudhandler to resourcehandler
+- Rename boto plugin to ec2
+- Complete reformat node definition
+- Auth is taken from separate file instead of resource config
+- Schema checking in each plugin
+- Rename dockerp.py to docker.py
+- Bugfixes in dry_run mode of plugins
+- Add public_key attribute to occi plugin
+- Add name optional attribute to all plugins
+
 v0.3.0 - January 2016
 - voms-based auth added to nova plugin
 - new plugin: docker

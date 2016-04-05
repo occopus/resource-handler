@@ -18,7 +18,7 @@ from pip.req import parse_requirements
 
 setuptools.setup(
     name='OCCO-ResourceHandler',
-    version='0.3.0',
+    version='1.0',
     author='MTA SZTAKI',
     author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
@@ -29,8 +29,7 @@ setuptools.setup(
     py_modules=[
         'occo.plugins.resourcehandler.nova',
         'occo.plugins.resourcehandler.cloudbroker',
-        'occo.plugins.resourcehandler.dummy',
-        'occo.plugins.resourcehandler.boto',
+        'occo.plugins.resourcehandler.ec2',
 	'occo.plugins.resourcehandler.docker',
 	'occo.plugins.resourcehandler.occi'
     ],
@@ -40,7 +39,7 @@ setuptools.setup(
     scripts=[],
     url='https://github.com/occopus',
     license='LICENSE.txt',
-    description='Occopus Cloud Handler',
+    description='Occopus Resource Handler',
     long_description=open('README.txt').read(),
     install_requires=[
         'argparse',
@@ -52,6 +51,7 @@ setuptools.setup(
         'OCCO-Util',
         'OCCO-InfoBroker',
         'requests',
-        'websocket-client'
+        'websocket-client',
+        'python-novaclient'
     ],
 )
