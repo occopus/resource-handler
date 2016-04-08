@@ -52,6 +52,9 @@ setuptools.setup(
         'OCCO-InfoBroker',
         'requests',
         'websocket-client',
-        'python-novaclient'
+        'python-novaclient',
+        'voms-auth-system-openstack',
+        'unicodecsv',
+        'simplejson'
     ],
 )
