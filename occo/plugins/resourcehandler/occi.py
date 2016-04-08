@@ -13,7 +13,7 @@
 ### limitations under the License.
 
 """ OCCI implementation of the
-:class:`~occo.cloudhandler.cloudhandler.CloudHandler` class.
+:class:`~occo.resourcehandler.resourcehandler.ResourceHandler` class.
 
 .. moduleauthor:: Zoltan Farkas <zoltan.farkas@sztaki.mta.hu>
 """
@@ -23,15 +23,16 @@ import uuid
 import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce, basic_run_process
-from occo.cloudhandler import CloudHandler, Command
+from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
 import itertools as it
 import logging
 import occo.constants.status as status
 import subprocess
 import json
 from pprint import pprint
+from occo.exceptions import SchemaError
 
-__all__ = ['OCCICloudHandler']
+__all__ = ['OCCIResourceHandler']
 
 PROTOCOL_ID = 'occi'
 STATE_MAPPING = {
@@ -41,13 +42,13 @@ STATE_MAPPING = {
     'suspended'       : status.SHUTDOWN,
 }
 
-log = logging.getLogger('occo.cloudhandler.nova')
+log = logging.getLogger('occo.resourcehandler.nova')
 
-def execute_command(target, auth_data, *args, **kwargs):
+def execute_command(endpoint, auth_data, *args, **kwargs):
     """
     Execute a custom command towards the target.
     """
-    cmd = ["occi", "-X", "-n", "x509", "-x", auth_data, "-e", target['endpoint']]
+    cmd = ["occi", "-X", "-n", "x509", "-x", auth_data['proxy'], "-e", endpoint]
     cmd.extend(args)
     #log.debug("Command is: %r", cmd)
     ret, out, err = basic_run_process(" ".join(cmd), input_data=kwargs.get('stdin'))
@@ -67,8 +68,7 @@ class CreateNode(Command):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
 
-    @wet_method(1)
-    def _start_instance(self, cloud_handler, node_def):
+    def _start_instance(self, resource_handler, node_def):
         """
         Start the VM instance.
 
@@ -77,50 +77,54 @@ class CreateNode(Command):
         :Remark: This is a "wet method", the VM will not be started
             if the instance is in debug mode (``dry_run``).
         """
-        os_tpl = node_def['os_tpl']
-        resource_tpl = node_def['resource_tpl']
+        os_tpl = node_def['resource']['os_tpl']
+        resource_tpl = node_def['resource']['resource_tpl']
         context = node_def['context']
+        public_key = node_def['resource'].get('public_key',None)
         log.debug("[%s] Creating new server using OS TPL %r and RESOURCE TPL %r",
-            cloud_handler.name, os_tpl, resource_tpl)
-        server = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a",
+            resource_handler.name, os_tpl, resource_tpl)
+        keyfile = "--context public_key=file://"+public_key if public_key else ""
+        server = execute_command(resource_handler.endpoint, resource_handler.auth_data, "-a",
             "create", "-r", "compute", "-M", os_tpl, "-M", resource_tpl, "-t",
             "occi.core.title=OCCO_OCCI_VM", "-T", "user_data=file:///dev/stdin",
-            stdin=context).splitlines()
+            keyfile, stdin=context).splitlines()
         return server[0]
 
-    def perform(self, cloud_handler):
-        log.debug("[%s] Creating node: %r",
-                  cloud_handler.name, self.resolved_node_definition['name'])
 
-        server = self._start_instance(cloud_handler, self.resolved_node_definition)
-        log.debug("[%s] Done; vm_id = %s", cloud_handler.name, server)
+    @wet_method(1)
+    def perform(self, resource_handler):
+        log.debug("[%s] Creating node: %r",
+                  resource_handler.name, self.resolved_node_definition['name'])
+
+        server = self._start_instance(resource_handler, self.resolved_node_definition)
+        log.debug("[%s] Done; vm_id = %s", resource_handler.name, server)
 
         status = 'inactive'
         while status != 'active':
             time.sleep(10)
-            description = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "describe",
-                "-r", server, "-o", "json")
+            description = execute_command(resource_handler.endpoint, resource_handler.auth_data,
+                                          "-a", "describe", "-r", server, "-o", "json")
             djson = json.loads(description)[0]
             status = djson['attributes']['occi']['compute']['state']
-            log.debug("[%s] Status of VM %s is: %s", cloud_handler.name, server, status)
+            log.debug("[%s] Status of VM %s is: %s", resource_handler.name, server, status)
 
-        if 'link' in self.resolved_node_definition:
-            for link in self.resolved_node_definition.get('link'):
+        if 'link' in self.resolved_node_definition['resource']:
+            for link in self.resolved_node_definition.get('resource',dict()).get('link',None):
                 attempts = 0
                 while attempts < 10:
                     try:
-                        log.debug("[%s] Adding link %s to server...", cloud_handler.name, link)
-                        linked = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "link", "-r", server,
-                            "-j", link)
+                        log.debug("[%s] Adding link %s to server...", resource_handler.name, link)
+                        linked = execute_command(resource_handler.endpoint, resource_handler.auth_data,
+                                 "-a", "link", "-r", server, "-j", link)
                     except Exception as e:
                         log.debug(e)
                         time.sleep(1)
                         attempts += 1
                     else:
-                        log.debug("[%s] Added link to server", cloud_handler.name)
+                        log.debug("[%s] Added link to server", resource_handler.name)
                         break
                 if attempts == 5:
-                    log.error("[%s] Failed to add link to server", cloud_handler.name)
+                    log.error("[%s] Failed to add link to server", resource_handler.name)
                     raise Exception('Failed to add link to server')
         return server
 
@@ -130,7 +134,7 @@ class DropNode(Command):
         self.instance_data = instance_data
 
     @wet_method()
-    def _delete_vms(self, cloud_handler, *vm_ids):
+    def _delete_vms(self, resource_handler, *vm_ids):
         """
         Terminate VM instances.
 
@@ -141,9 +145,10 @@ class DropNode(Command):
             if the instance is in debug mode (``dry_run``).
         """
         for server in vm_ids:
-            res = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "delete", "-r", server)
+            res = execute_command(resource_handler.endpoint, resource_handler.auth_data, 
+                                  "-a", "delete", "-r", server)
 
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         """
         Terminate a VM instance.
 
@@ -151,12 +156,12 @@ class DropNode(Command):
         :type instance_data: :ref:`Instance Data <instancedata>`
         """
         instance_id = self.instance_data['instance_id']
-        log.debug("[%s] Dropping node %r", cloud_handler.name,
+        log.debug("[%s] Dropping node %r", resource_handler.name,
                   self.instance_data['node_id'])
 
-        self._delete_vms(cloud_handler, instance_id)
+        self._delete_vms(resource_handler, instance_id)
 
-        log.debug("[%s] Done", cloud_handler.name)
+        log.debug("[%s] Done", resource_handler.name)
 
 class GetState(Command):
     def __init__(self, instance_data):
@@ -164,11 +169,11 @@ class GetState(Command):
         self.instance_data = instance_data
 
     @wet_method('ready')
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         log.debug("[%s] Acquiring node state %r",
-                  cloud_handler.name, self.instance_data['node_id'])
-        description = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "describe",
-            "-r", self.instance_data['instance_id'], "-o", "json")
+                  resource_handler.name, self.instance_data['node_id'])
+        description = execute_command(resource_handler.endpoint, resource_handler.auth_data, 
+                                      "-a", "describe","-r", self.instance_data['instance_id'], "-o", "json")
         djson = json.loads(description)[0]
         inst_state = djson['attributes']['occi']['compute']['state']
         try:
@@ -177,7 +182,7 @@ class GetState(Command):
             raise NotImplementedError('Unknown OCCI state', inst_state)
         else:
             log.debug("[%s] Done; occi_state=%r; status=%r",
-                      cloud_handler.name, inst_state, retval)
+                      resource_handler.name, inst_state, retval)
             return retval
 
 class GetIpAddress(Command):
@@ -186,12 +191,12 @@ class GetIpAddress(Command):
         self.instance_data = instance_data
 
     @wet_method('127.0.0.1')
-    def perform(self, cloud_handler):
+    def perform(self, resource_handler):
         log.debug("[%s] Acquiring IP address for %r",
-                  cloud_handler.name,
+                  resource_handler.name,
                   self.instance_data['node_id'])
-        description = execute_command(cloud_handler.target, cloud_handler.auth_data, "-a", "describe",
-            "-r", self.instance_data['instance_id'], "-o", "json")
+        description = execute_command(resource_handler.endpoint, resource_handler.auth_data, 
+                                      "-a", "describe","-r", self.instance_data['instance_id'], "-o", "json")
         djson = json.loads(description)
         for link in djson[0]['links']:
             ltype = link['kind']
@@ -201,10 +206,10 @@ class GetIpAddress(Command):
                 return ip
         return None
 
-@factory.register(CloudHandler, PROTOCOL_ID)
-class OCCICloudHandler(CloudHandler):
+@factory.register(ResourceHandler, PROTOCOL_ID)
+class OCCIResourceHandler(ResourceHandler):
     """ Implementation of the
-    :class:`~occo.cloudhandler.cloudhandler.CloudHandler` class utilizing the
+    :class:`~occo.resourcehandler.resourcehandler.ResourceHandler` class utilizing the
     OCCI interface.
 
     :param dict target: Definition of the EC2 endpoint. This must contain:
@@ -218,23 +223,20 @@ class OCCICloudHandler(CloudHandler):
         * ``username``: The access key.
         * ``password``: The secret key.
 
-    :param str name: The name of this ``CloudHandler`` instance. If unset,
+    :param str name: The name of this ``ResourceHandler`` instance. If unset,
         ``target['endpoint']`` is used.
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
     """
-    def __init__(self, target, auth_data,
+    def __init__(self, endpoint, auth_data,
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
-        self.name = name if name else target['auth_url']
-        self.target, self.auth_data = target, auth_data
-        # The following is intentional. It is a constant yet, but maybe it'll
-        # change in the future.
-        self.resource_type = 'vm'
+        self.name = name if name else endpoint
+        self.endpoint, self.auth_data = endpoint, auth_data
 
     def get_connection(self):
-        return setup_connection(self.target, self.auth_data, self.auth_type)
+        return setup_connection(self.endpoint, self.auth_data, self.auth_type)
 
     def cri_create_node(self, resolved_node_definition):
         return CreateNode(resolved_node_definition)
@@ -253,3 +255,21 @@ class OCCICloudHandler(CloudHandler):
 
     def perform(self, instruction):
         instruction.perform(self)
+
+@factory.register(RHSchemaChecker, PROTOCOL_ID)
+class OcciSchemaChecker(RHSchemaChecker):
+    def __init__(self):
+        self.req_keys = ["type", "endpoint", "os_tpl", "resource_tpl"]
+        self.opt_keys = ["link", "public_key", "name"]
+    def perform_check(self, data):
+        missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
+        if missing_keys:
+            msg = "Missing key(s): " + ', '.join(str(key) for key in missing_keys)
+            raise SchemaError(msg)
+        valid_keys = self.req_keys + self.opt_keys
+        invalid_keys = RHSchemaChecker.get_invalid_keys(self, data, valid_keys)
+        if invalid_keys:
+            msg = "Unknown key(s): " + ', '.join(str(key) for key in invalid_keys)
+            raise SchemaError(msg)
+        return True
+

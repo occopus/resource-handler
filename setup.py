@@ -17,30 +17,29 @@ import setuptools
 from pip.req import parse_requirements
 
 setuptools.setup(
-    name='OCCO-CloudHandler',
-    version='0.3.0',
+    name='OCCO-ResourceHandler',
+    version='1.0',
     author='MTA SZTAKI',
     author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
         'occo',
         'occo.plugins',
-        'occo.plugins.cloudhandler',
+        'occo.plugins.resourcehandler',
     ],
     py_modules=[
-        'occo.plugins.cloudhandler.nova',
-        'occo.plugins.cloudhandler.cloudbroker',
-        'occo.plugins.cloudhandler.dummy',
-        'occo.plugins.cloudhandler.boto',
-	'occo.plugins.cloudhandler.dockerp',
-	'occo.plugins.cloudhandler.occi'
+        'occo.plugins.resourcehandler.nova',
+        'occo.plugins.resourcehandler.cloudbroker',
+        'occo.plugins.resourcehandler.ec2',
+	'occo.plugins.resourcehandler.docker',
+	'occo.plugins.resourcehandler.occi'
     ],
     packages=[
-        'occo.cloudhandler',
+        'occo.resourcehandler',
     ],
     scripts=[],
     url='https://github.com/occopus',
     license='LICENSE.txt',
-    description='Occopus Cloud Handler',
+    description='Occopus Resource Handler',
     long_description=open('README.txt').read(),
     install_requires=[
         'argparse',
@@ -52,6 +51,10 @@ setuptools.setup(
         'OCCO-Util',
         'OCCO-InfoBroker',
         'requests',
-        'websocket-client'
+        'websocket-client',
+        'python-novaclient',
+        'voms-auth-system-openstack',
+        'unicodecsv',
+        'simplejson'
     ],
 )

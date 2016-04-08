@@ -12,10 +12,12 @@ if [ -d wheelhouse ]; then
     fi
 fi
 
+rm -rf $PDIR
+mkdir -p wheelhouse
 virtualenv --no-site-packages $PDIR
 source $PDIR/bin/activate
 pip install --upgrade pip
 pip install wheel
-pip wheel --find-links http://pip.lpds.sztaki.hu/packages --trusted-host pip.lpds.sztaki.hu .
+pip wheel --wheel-dir=wheelhouse --find-links http://pip.lpds.sztaki.hu/packages --trusted-host pip.lpds.sztaki.hu .
 deactivate
 rm -rf $PDIR
