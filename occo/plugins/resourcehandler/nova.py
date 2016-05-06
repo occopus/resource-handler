@@ -55,7 +55,7 @@ def setup_connection(endpoint, tenant_name, auth_data):
     if auth_data.get('type',None) is None:
         user = auth_data['username']
         password = auth_data['password']
-        nt = client.Client('2.0', user, password, tenant_name, auth_url)
+        nt = novaclient.client.Client('2.0', user, password, tenant_name, endpoint)
     elif auth_data.get('type',None) == 'voms':
         novaclient.auth_plugin.discover_auth_systems()
         auth_plugin = novaclient.auth_plugin.load_plugin('voms')
