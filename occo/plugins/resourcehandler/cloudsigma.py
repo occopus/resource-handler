@@ -59,6 +59,7 @@ class CreateNode(Command):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
 
+    @wet_method(1)
     def _clone_drive(self, resource_handler, libdrive_id):
         r = requests.post(resource_handler.endpoint + '/libdrives/' + libdrive_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'clone'})
@@ -72,6 +73,15 @@ class CreateNode(Command):
             log.error('[%s] Cloning library drive %s failed: did not receive UUID!', resource_handler.name, libdrive_id)
         return uuid
 
+    def _delete_drive(self, resource_handler, drv_id):
+        r = requests.delete(resource_handler.endpoint + '/drives/' + drv_id + '/',
+            auth=get_auth(resource_handler.auth_data))
+        if r.status_code != 204:
+            log.error('[%s] Deleting cloned drive %s failed with status code %d!', resource_handler.name, drv_id, r.status_code)
+            log.error('[%s] Response text: %s', resource_handler.name, r.text)
+       
+
+    @wet_method('unmounted')
     def _get_drive_status(self, resource_handler, drv_id):
         r = requests.get(resource_handler.endpoint + '/drives/' + drv_id + '/',
             auth=get_auth(resource_handler.auth_data))
@@ -123,6 +133,7 @@ class CreateNode(Command):
         log.debug('[%s] Created server\'s UUID is: %s', resource_handler.name, srv_uuid)
         return srv_uuid
 
+    @wet_method(True)
     def _start_server(self, resource_handler, srv_id):
         r = requests.post(resource_handler.endpoint + '/servers/' + srv_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'start'})
@@ -138,13 +149,21 @@ class CreateNode(Command):
 
         drv_id = self._clone_drive(resource_handler, self.resolved_node_definition['resource']['libdrive_id'])
         drv_st = 'unknown'
-        while drv_st != 'unmounted':
+        steps = 0
+        sval = 1
+        while drv_st != 'unmounted' and steps < 5:
             drv_st = self._get_drive_status(resource_handler, drv_id)
-            time.sleep(2)
+            time.sleep(sval)
+            steps += 1
+            sval *=  2
+        if steps == 5 and drv_st != 'unmounted':
+            log.error('[%s] Cloned drive failed to enter unmounted status, aborting', resource_handler.name)
+            self._delete_drive(resource_handler, drv_id)
+            return None
 
         srv_id = self._create_server(resource_handler, drv_id)
         while True != self._start_server(resource_handler, srv_id):
-            time.sleep(2)
+            time.sleep(5)
 
         return srv_id
 
@@ -160,7 +179,6 @@ class DropNode(Command):
             log.error('[%s] Failed to delete server, response code: %d', resource_handler.name, r.status_code)
             log.error('[%s] Response text: %s', resource_handler.name, r.text)
 
-    @wet_method()
     def _delete_server(self, resource_handler, srv_id):
         r = requests.delete(resource_handler.endpoint + '/servers/' + srv_id + '/',
             auth=get_auth(resource_handler.auth_data), params={'recurse': 'all_drives'},
@@ -169,6 +187,7 @@ class DropNode(Command):
             log.error('[%s] Failed to delete server, response code: %d', resource_handler.name, r.status_code)
             log.error('[%s] Response text: %s', resource_handler.name, r.text)
 
+    @wet_method()
     def perform(self, resource_handler):
         """
         Terminate a VM instance.
@@ -182,7 +201,7 @@ class DropNode(Command):
 
         self._stop_server(resource_handler, srv_id)
         while 'stopped' != get_server_json(resource_handler, srv_id)['status']:
-            time.sleep(2)
+            time.sleep(5)
         self._delete_server(resource_handler, srv_id)
 
         log.debug("[%s] Done", resource_handler.name)
