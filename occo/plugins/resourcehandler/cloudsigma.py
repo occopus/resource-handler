@@ -79,7 +79,6 @@ class CreateNode(Command):
         if r.status_code != 204:
             log.error('[%s] Deleting cloned drive %s failed with status code %d!', resource_handler.name, drv_id, r.status_code)
             log.error('[%s] Response text: %s', resource_handler.name, r.text)
-       
 
     @wet_method('unmounted')
     def _get_drive_status(self, resource_handler, drv_id):
@@ -314,7 +313,7 @@ class CloudSigmaResourceHandler(ResourceHandler):
 class CloudSigmaSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "libdrive_id", "description"]
-        self.req_desc_keys = ['cpu', 'mem']
+        self.req_desc_keys = ['cpu', 'mem', 'vnc_password']
         self.opt_keys = ["name"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
