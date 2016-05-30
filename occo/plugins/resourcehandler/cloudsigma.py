@@ -314,11 +314,16 @@ class CloudSigmaResourceHandler(ResourceHandler):
 class CloudSigmaSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "libdrive_id", "description"]
+        self.req_desc_keys = ['cpu', 'mem']
         self.opt_keys = ["name"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
             msg = "Missing key(s): " + ', '.join(str(key) for key in missing_keys)
+            raise SchemaError(msg)
+        missing_keys = RHSchemaChecker.get_missing_keys(self, data['description'], self.req_desc_keys)
+        if missing_keys:
+            msg = "Missing key(s) in description: " + ', '.join(str(key) for key in missing_keys)
             raise SchemaError(msg)
         valid_keys = self.req_keys + self.opt_keys
         invalid_keys = RHSchemaChecker.get_invalid_keys(self, data, valid_keys)
