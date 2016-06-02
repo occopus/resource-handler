@@ -29,6 +29,7 @@ setuptools.setup(
     py_modules=[
         'occo.plugins.resourcehandler.nova',
         'occo.plugins.resourcehandler.cloudbroker',
+        'occo.plugins.resourcehandler.cloudsigma',
         'occo.plugins.resourcehandler.ec2',
 	'occo.plugins.resourcehandler.docker',
 	'occo.plugins.resourcehandler.occi'
