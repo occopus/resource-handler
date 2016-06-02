@@ -88,6 +88,10 @@ class CreateNode(Command):
             "create", "-r", "compute", "-M", os_tpl, "-M", resource_tpl, "-t",
             "occi.core.title=OCCO_OCCI_VM", "-T", "user_data=file:///dev/stdin",
             keyfile, stdin=context).splitlines()
+        if len(server) == 0:
+            log.error("[%s] Failed to start server, see log file for details!", resource_handler.name)
+            raise Exception("Failed to start server, see log file for details!")
+
         return server[0]
 
 
