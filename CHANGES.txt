@@ -1,3 +1,8 @@
+v1.1 - June 2016
+- Add CloudSigma resource handler plugin
+- Fix bug in nova plugin
+- Fix bug in docker plugin
+- Fix bug in occi plugin
 
 v1.0 - April 2016
 - Fix network issue in docker plugin

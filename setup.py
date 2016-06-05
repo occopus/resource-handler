@@ -18,7 +18,7 @@ from pip.req import parse_requirements
 
 setuptools.setup(
     name='OCCO-ResourceHandler',
-    version='1.0',
+    version='1.1',
     author='MTA SZTAKI',
     author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
@@ -29,6 +29,7 @@ setuptools.setup(
     py_modules=[
         'occo.plugins.resourcehandler.nova',
         'occo.plugins.resourcehandler.cloudbroker',
+        'occo.plugins.resourcehandler.cloudsigma',
         'occo.plugins.resourcehandler.ec2',
 	'occo.plugins.resourcehandler.docker',
 	'occo.plugins.resourcehandler.occi'
@@ -46,6 +47,7 @@ setuptools.setup(
         'backports.ssl-match-hostname',
         'boto',
         'docker-py',
+        'ndg-httpsclient',
         'python-dateutil',
         'PyYAML',
         'OCCO-Util',

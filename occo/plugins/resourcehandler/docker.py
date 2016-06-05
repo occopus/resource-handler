@@ -137,16 +137,16 @@ class GetState(Command):
             return status.READY
 
         elif info['State']['StartedAt'] == info['State']['FinishedAt']:
-            log.debug("[%s] Done; retval=%r; status=%r",
+            log.debug("[%s] Done; retval=%r; status=%r",resource_handler.name,
                       'Pending', status.PENDING)
 
         elif info['State']['ExitCode'] == '-1':
-            log.debug("[%s] Done; retval=%r; status=%r",
+            log.debug("[%s] Done; retval=%r; status=%r",resource_handler.name,
                       'Failed', status.TMP_FAIL)
             return status.TMP_FAIL
 
         elif not info['State']['Running']:
-            log.debug("[%s] Done; retval=%r; status=%r",
+            log.debug("[%s] Done; retval=%r; status=%r",resource_handler.name,
                       'Finished', status.SHUTDOWN)
             return status.SHUTDOWN
         else:
