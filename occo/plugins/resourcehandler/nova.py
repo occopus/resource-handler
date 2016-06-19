@@ -23,6 +23,8 @@ import uuid
 import novaclient
 import novaclient.client
 import novaclient.auth_plugin
+from keystoneauth1 import loading
+from keystoneauth1 import session
 import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce
@@ -48,14 +50,23 @@ STATE_MAPPING = {
 
 log = logging.getLogger('occo.resourcehandler.nova')
 
-def setup_connection(endpoint, tenant_name, auth_data):
+def setup_connection(endpoint, auth_data, resolved_node_definition):
     """
     Setup the connection to the Nova endpoint.
     """
+    tenant_name = resolved_node_definition['resource'].get('tenant_name', None)
+    project_id = resolved_node_definition['resource'].get('project_id', None)
+    user_domain_name = resolved_node_definition['resource'].get('user_domain_name', 'Default')
     if auth_data.get('type',None) is None:
         user = auth_data['username']
         password = auth_data['password']
-        nt = novaclient.client.Client('2.0', user, password, tenant_name, endpoint)
+        if tenant_name is not None:
+            nt = novaclient.client.Client('2.0', user, password, tenant_name, endpoint)
+        else:
+            loader = loading.get_plugin_loader('password')
+            auth = loader.load_from_options(auth_url=endpoint, username=user, password=password, project_id=project_id, user_domain_name=user_domain_name)
+            sess = session.Session(auth=auth)
+            nt = novaclient.client.Client(2, session=sess)
     elif auth_data.get('type',None) == 'voms':
         novaclient.auth_plugin.discover_auth_systems()
         auth_plugin = novaclient.auth_plugin.load_plugin('voms')
@@ -73,7 +84,7 @@ def needs_connection(f):
     import functools
     @functools.wraps(f)
     def g(self, resource_handler, *args, **kwargs):
-        self.conn = resource_handler.get_connection()
+        self.conn = resource_handler.get_connection(self.resolved_node_definition)
         return f(self, resource_handler, *args, **kwargs)
 
     return g
@@ -100,10 +111,14 @@ class CreateNode(Command):
         sec_groups = node_def['resource'].get('security_groups', None)
         key_name = node_def['resource'].get('key_name', None)
         server_name = node_def['resource'].get('server_name',str(uuid.uuid4()))
+        network_id = node_def['resource'].get('network_id', None)
+        nics = None
+        if network_id is not None:
+            nics = [{"net-id": network_id, "v4-fixed-ip": ''}]
         log.debug("[%s] Creating new server using image ID %r and flavor name %r",
             resource_handler.name, image_id, flavor_name)
         server = self.conn.servers.create(server_name, image_id, flavor_name,
-            security_groups=sec_groups, key_name=key_name, userdata=context)
+            security_groups=sec_groups, key_name=key_name, userdata=context, nics=nics)
         log.debug('Reservation: %r, server ID: %r', server, server.id)
         return server
 
@@ -133,12 +148,14 @@ class CreateNode(Command):
                 log.error("[%s] Failed to add floating IP to server", resource_handler.name)
                 self.conn.floating_ips.delete(floating_ip)
                 raise Exception('Failed to add floating IP')
+        
         return server.id
 
 class DropNode(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
-        self.instance_data = instance_data    
+        self.instance_data = instance_data
+        self.resolved_node_definition = instance_data['resolved_node_definition']
 
     @wet_method()
     @needs_connection
@@ -180,6 +197,7 @@ class GetState(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
         self.instance_data = instance_data
+        self.resolved_node_definition = instance_data['resolved_node_definition']
 
     @wet_method('ready')
     @needs_connection
@@ -201,6 +219,7 @@ class GetIpAddress(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
         self.instance_data = instance_data
+        self.resolved_node_definition = instance_data['resolved_node_definition']
 
     @wet_method('127.0.0.1')
     @needs_connection
@@ -241,17 +260,17 @@ class NovaResourceHandler(ResourceHandler):
     :param bool dry_run: Skip actual resource aquisition, polling, etc.
 
     """
-    def __init__(self, endpoint, tenant_name, auth_data,
+    def __init__(self, endpoint, auth_data,
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
         self.name = name if name else endpoint
         self.endpoint = endpoint
-        self.tenant_name = tenant_name
         self.auth_data = auth_data
+        self.data = config
 
-    def get_connection(self):
-        return setup_connection(self.endpoint, self.tenant_name, self.auth_data)
+    def get_connection(self, resolved_node_definition):
+        return setup_connection(self.endpoint, self.auth_data, resolved_node_definition)
 
     def cri_create_node(self, resolved_node_definition):
         return CreateNode(resolved_node_definition)
@@ -270,12 +289,12 @@ class NovaResourceHandler(ResourceHandler):
 
     def perform(self, instruction):
         instruction.perform(self)
-
+    
 @factory.register(RHSchemaChecker, PROTOCOL_ID)
 class NovaSchemaChecker(RHSchemaChecker):
     def __init__(self):
-        self.req_keys = ["type", "endpoint", "tenant_name", "image_id", "flavor_name"]
-        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip","name"]
+        self.req_keys = ["type", "endpoint", "image_id", "flavor_name"]
+        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip", "name", "project_id", "tenant_name", "user_domain_name", "network_id"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
