@@ -129,8 +129,9 @@ class CreateNode(Command):
         server = self._start_instance(resource_handler, self.resolved_node_definition)
         log.debug("[%s] Done; vm_id = %r", resource_handler.name, server.id)
 
-        if 'floating_ip' in self.resolved_node_definition['resource']:
-            floating_ip = self.conn.floating_ips.create()
+        pool = self.resolved_node_definition['resource'].get('floating_ip_pool', None)
+        if ('floating_ip' in self.resolved_node_definition['resource']) or (pool is not None):
+            floating_ip = self.conn.floating_ips.create(pool=pool)
             log.debug("[%s] Created floating IP: %r", resource_handler.name, floating_ip)
             attempts = 0
             while attempts < 10:
@@ -294,7 +295,7 @@ class NovaResourceHandler(ResourceHandler):
 class NovaSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "image_id", "flavor_name"]
-        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip", "name", "project_id", "tenant_name", "user_domain_name", "network_id"]
+        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip", "name", "project_id", "tenant_name", "user_domain_name", "network_id", "floating_ip_pool"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
