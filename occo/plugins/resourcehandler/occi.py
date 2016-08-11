@@ -50,7 +50,7 @@ def execute_command(endpoint, auth_data, *args, **kwargs):
     """
     cmd = ["occi", "-X", "-n", "x509", "-x", auth_data['proxy'], "-e", endpoint]
     cmd.extend(args)
-    #log.debug("Command is: %r", cmd)
+    log.debug("Command is: %r", " ".join(cmd))
     ret, out, err = basic_run_process(" ".join(cmd), input_data=kwargs.get('stdin'))
     #if 'stdin' in kwargs:
         #p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, stdin=subprocess.PIPE)
