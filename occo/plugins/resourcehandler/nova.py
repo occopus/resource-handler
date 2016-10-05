@@ -108,7 +108,7 @@ class CreateNode(Command):
         context = node_def['context']
         sec_groups = node_def['resource'].get('security_groups', None)
         key_name = node_def['resource'].get('key_name', None)
-        server_name = node_def['resource'].get('server_name',str(uuid.uuid4()))
+        server_name = node_def['resource'].get('server_name',node_def['node_id'])
         network_id = node_def['resource'].get('network_id', None)
         nics = None
         if network_id is not None:
