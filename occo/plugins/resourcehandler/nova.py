@@ -105,7 +105,7 @@ class CreateNode(Command):
         """
         image_id = node_def['resource']['image_id']
         flavor_name = node_def['resource']['flavor_name']
-        context = node_def['context']
+        context = node_def.get('context', None)
         sec_groups = node_def['resource'].get('security_groups', None)
         key_name = node_def['resource'].get('key_name', None)
         server_name = node_def['resource'].get('server_name',node_def['node_id'])
@@ -131,25 +131,35 @@ class CreateNode(Command):
 
         pool = self.resolved_node_definition['resource'].get('floating_ip_pool', None)
         if ('floating_ip' in self.resolved_node_definition['resource']) or (pool is not None):
-            floating_ip = self.conn.floating_ips.create(pool=pool)
-            log.debug("[%s] Created floating IP: %r", resource_handler.name, floating_ip)
+            unused_ips = [addr for addr in self.conn.floating_ips.list() \
+                         if addr.instance_id is None and ( not pool or pool == addr.pool) ]
+            if not unused_ips:
+                if pool is not None:
+		    msg = "Cannot find unused floating ip address in pool \"" + pool + "\"!"
+                else:
+                    msg = "Cannot find unused floating ip address!"
+                server = self.conn.servers.get(server.id)
+                self.conn.servers.delete(server)
+		raise Exception(msg)
+            floating_ip = unused_ips[0]
+            log.debug("[%s] Selected floating ip: %r", resource_handler.name, floating_ip)
             attempts = 0
-            while attempts < 10:
+            while attempts < 5:
                 try:
-                    log.debug("[%s] Adding floating IP to server...", resource_handler.name)
+                    log.debug("[%s] Associating floating ip to node...", resource_handler.name)
                     server.add_floating_ip(floating_ip)
                 except Exception as e:
                     log.debug(e)
                     time.sleep(1)
                     attempts += 1
                 else:
-                    log.debug("[%s] Added floating IP to server", resource_handler.name)
+                    log.debug("[%s] Associating floating ip to node", resource_handler.name)
                     break
             if attempts == 5:
-                log.error("[%s] Failed to add floating IP to server", resource_handler.name)
-                self.conn.floating_ips.delete(floating_ip)
-                raise Exception('Failed to add floating IP')
-        
+                log.error("[%s] Failed to associate floating ip to node!", resource_handler.name)
+                server = self.conn.servers.get(server.id)
+                self.conn.servers.delete(server)
+                raise Exception('Failed to associate floating ip to node!')
         return server.id
 
 class DropNode(Command):
@@ -171,12 +181,6 @@ class DropNode(Command):
             if the instance is in debug mode (``dry_run``).
         """
         server = self.conn.servers.get(vm_ids)
-        floating_ips = self.conn.floating_ips.list()
-        for floating_ip in floating_ips:
-            if floating_ip.instance_id == server.id:
-                log.debug("[%s] Removing floating IP %r allocated for the VM",
-                    resource_handler.name, floating_ip.ip)
-                self.conn.floating_ips.delete(floating_ip)
         self.conn.servers.delete(server)
 
     def perform(self, resource_handler):
