@@ -144,18 +144,18 @@ class CreateNode(Command):
             floating_ip = unused_ips[0]
             log.debug("[%s] Selected floating ip: %r", resource_handler.name, floating_ip)
             attempts = 0
-            while attempts < 5:
+            while attempts < 20:
                 try:
                     log.debug("[%s] Associating floating ip to node...", resource_handler.name)
                     server.add_floating_ip(floating_ip)
                 except Exception as e:
                     log.debug(e)
-                    time.sleep(1)
+                    time.sleep(3)
                     attempts += 1
                 else:
                     log.debug("[%s] Associating floating ip to node", resource_handler.name)
                     break
-            if attempts == 5:
+            if attempts == 20:
                 log.error("[%s] Failed to associate floating ip to node!", resource_handler.name)
                 server = self.conn.servers.get(server.id)
                 self.conn.servers.delete(server)
