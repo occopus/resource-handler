@@ -271,6 +271,11 @@ class NovaResourceHandler(ResourceHandler):
         self.dry_run = dry_run
         self.name = name if name else endpoint
         self.endpoint = endpoint
+        if (not auth_data) or \
+              (((not "username" in auth_data) or (not "password" in auth_data)) and \
+               ((not "type" in auth_data) or (not "proxy" in auth_data))):
+              errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
+              raise Exception(errormsg)
         self.auth_data = auth_data
         self.data = config
 
