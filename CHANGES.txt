@@ -1,3 +1,8 @@
+
+v1.3 - January 2017
+- Make plugins check auth_data existence themselves
+- Fix floating ip handling and contextless node creation in nova plugin
+
 v1.2 - August 2016
 - Add keystone v3 password-based authentication to nova plugin
 - Occi plugin: logging occi-command

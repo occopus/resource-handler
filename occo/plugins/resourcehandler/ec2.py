@@ -240,6 +240,9 @@ class EC2ResourceHandler(ResourceHandler):
         self.name = name if name else endpoint
         self.endpoint = endpoint
         self.regionname = regionname
+        if (not auth_data) or (not "accesskey" in auth_data) or (not "secretkey" in auth_data):
+           errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
+           raise Exception(errormsg)
         self.auth_data = auth_data
 
     def get_connection(self):

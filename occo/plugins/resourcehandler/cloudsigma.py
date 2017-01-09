@@ -288,6 +288,9 @@ class CloudSigmaResourceHandler(ResourceHandler):
                  **config):
         self.dry_run = dry_run
         self.name = name if name else endpoint
+        if (not auth_data) or (not "email" in auth_data) or (not "password" in auth_data):
+           errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
+           raise Exception(errormsg)
         self.endpoint = endpoint if not dry_run else None
         self.auth_data = auth_data if not dry_run else None
 
