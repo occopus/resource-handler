@@ -74,7 +74,7 @@ class CreateNode(Command):
         return uuid
 
     def _delete_drive(self, resource_handler, drv_id):
-        r = requests.delete(resource_handler.endpoint + '/drives/' + drv_id + '/',
+        r = requests.delete(resource_handler.endpoint + '/drives/' + str(drv_id) + '/',
             auth=get_auth(resource_handler.auth_data))
         if r.status_code != 204:
             log.error('[%s] Deleting cloned drive %s failed with status code %d!', resource_handler.name, drv_id, r.status_code)
@@ -82,7 +82,7 @@ class CreateNode(Command):
 
     @wet_method('unmounted')
     def _get_drive_status(self, resource_handler, drv_id):
-        r = requests.get(resource_handler.endpoint + '/drives/' + drv_id + '/',
+        r = requests.get(resource_handler.endpoint + '/drives/' + str(drv_id) + '/',
             auth=get_auth(resource_handler.auth_data))
         if r.status_code != 200:
             log.error('[%s] Failed to query drive status, response code: %d', resource_handler.name, r.status_code)
@@ -117,7 +117,7 @@ class CreateNode(Command):
             "boot_order": 1,
             "dev_channel": "0:0",
             "device": "virtio",
-            "drive": drv_id
+            "drive": str(drv_id)
         }
         descr['drives'].append(nd)
         json_data = {}
