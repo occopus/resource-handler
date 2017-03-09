@@ -27,7 +27,7 @@ import itertools as it
 import logging
 import occo.constants.status as status
 import requests, json, uuid, time, base64
-from occo.exceptions import SchemaError
+from occo.exceptions import SchemaError, NodeCreationError
 
 __all__ = ['CloudSigmaResourceHandler']
 
@@ -46,6 +46,8 @@ def get_auth(auth_data):
     return (auth_data['email'], auth_data['password'])
 
 def get_server_json(resource_handler, srv_id):
+    if not srv_id:
+       return None 
     r = requests.get(resource_handler.endpoint + '/servers/' + srv_id + '/',
         auth=get_auth(resource_handler.auth_data))
     if r.status_code != 200:
@@ -147,18 +149,15 @@ class CreateNode(Command):
                   resource_handler.name, self.resolved_node_definition['name'])
 
         drv_id = self._clone_drive(resource_handler, self.resolved_node_definition['resource']['libdrive_id'])
-        drv_st = 'unknown'
-        steps = 0
-        sval = 1
-        while drv_st != 'unmounted' and steps < 5:
+        drv_st = self._get_drive_status(resource_handler, drv_id)
+        while drv_st == 'cloning_dst':
+            log.debug("[%s] Waiting for cloned drive to enter unmounted state, currently %r",resource_handler.name, drv_st)
+            time.sleep(5)
             drv_st = self._get_drive_status(resource_handler, drv_id)
-            time.sleep(sval)
-            steps += 1
-            sval *=  2
-        if steps == 5 and drv_st != 'unmounted':
-            log.error('[%s] Cloned drive failed to enter unmounted status, aborting', resource_handler.name)
-            self._delete_drive(resource_handler, drv_id)
-            return None
+        if drv_st != 'unmounted':
+            msg = '['+resource_handler.name+'] Cloned drive failed to enter unmounted status, aborting'
+            log.error(msg)
+            raise NodeCreationError(msg)
 
         srv_id = self._create_server(resource_handler, drv_id)
         while True != self._start_server(resource_handler, srv_id):
@@ -195,6 +194,7 @@ class DropNode(Command):
         :type instance_data: :ref:`Instance Data <instancedata>`
         """
         srv_id = self.instance_data['instance_id']
+        
         log.debug("[%s] Deleting server %r", resource_handler.name,
                 self.instance_data['node_id'])
 
