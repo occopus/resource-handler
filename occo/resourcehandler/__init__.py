@@ -22,7 +22,7 @@ __all__ = ['ResourceHandler', 'ResourceHandlerProvider']
 
 import occo.infobroker as ib
 import occo.util.factory as factory
-import yaml
+from ruamel import yaml
 import logging
 import time
 from occo.exceptions import SchemaError
