@@ -21,7 +21,7 @@
 from __future__ import absolute_import
 import urlparse
 import occo.util.factory as factory
-from occo.util import wet_method, coalesce
+from occo.util import wet_method, coalesce, unique_vmname
 from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
 import itertools as it
 import logging
@@ -112,7 +112,7 @@ class CreateNode(Command):
         if 'vnc_password' not in descr:
             descr['vnc_password'] = str(uuid.uuid4())
         if 'name' not in descr:
-            descr['name'] = str(self.resolved_node_definition.get('node_id'))
+            descr['name'] = unique_vmname(self.resolved_node_definition)
         if 'drivers' not in descr:
             descr['drives'] = []
         nd = {

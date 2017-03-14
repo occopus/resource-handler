@@ -28,7 +28,7 @@ from keystoneauth1 import loading
 from keystoneauth1 import session
 import urlparse
 import occo.util.factory as factory
-from occo.util import wet_method, coalesce
+from occo.util import wet_method, coalesce, unique_vmname
 from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
 import itertools as it
 import logging
@@ -109,7 +109,7 @@ class CreateNode(Command):
         context = node_def.get('context', None)
         sec_groups = node_def['resource'].get('security_groups', None)
         key_name = node_def['resource'].get('key_name', None)
-        server_name = node_def['resource'].get('server_name',node_def['node_id'])
+        server_name = node_def['resource'].get('server_name',unique_vmname(node_def))
         network_id = node_def['resource'].get('network_id', None)
         nics = None
         if network_id is not None:
