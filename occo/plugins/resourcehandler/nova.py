@@ -20,6 +20,7 @@
 
 import time
 import uuid
+import random
 import novaclient
 import novaclient.client
 import novaclient.auth_plugin
@@ -125,38 +126,42 @@ class CreateNode(Command):
     def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
                   resource_handler.name, self.resolved_node_definition['name'])
-
+       
         server = self._start_instance(resource_handler, self.resolved_node_definition)
         log.debug("[%s] Done; vm_id = %r", resource_handler.name, server.id)
-
+        
         pool = self.resolved_node_definition['resource'].get('floating_ip_pool', None)
         if ('floating_ip' in self.resolved_node_definition['resource']) or (pool is not None):
-            unused_ips = [addr for addr in self.conn.floating_ips.list() \
-                         if addr.instance_id is None and ( not pool or pool == addr.pool) ]
-            if not unused_ips:
-                if pool is not None:
-		    msg = "Cannot find unused floating ip address in pool \"" + pool + "\"!"
-                else:
-                    msg = "Cannot find unused floating ip address!"
-                server = self.conn.servers.get(server.id)
-                self.conn.servers.delete(server)
-		raise Exception(msg)
-            floating_ip = unused_ips[0]
-            log.debug("[%s] Selected floating ip: %r", resource_handler.name, floating_ip)
-            attempts = 0
-            while attempts < 20:
+            flip_waiting = 5 
+            flip_attempts = 60
+            attempts = 1
+            while attempts <= flip_attempts:
+                unused_ips = [addr for addr in self.conn.floating_ips.list() \
+                             if addr.instance_id is None and ( not pool or pool == addr.pool) ]
+                if not unused_ips:
+                    if pool is not None:
+                        msg = "Cannot find unused floating ip address in pool \"" + pool + "\"!"
+                    else:
+                        msg = "Cannot find unused floating ip address!"
+                    server = self.conn.servers.get(server.id)
+                    self.conn.servers.delete(server)
+                    raise Exception(msg)
+                log.debug("[%s] List of unused floating ips: %s", resource_handler.name, str([ ip.ip for ip in unused_ips]))
+                floating_ip = random.choice(unused_ips)
                 try:
-                    log.debug("[%s] Associating floating ip to node...", resource_handler.name)
+                    log.debug("[%s] Try associating floating ip (%s) to node...", resource_handler.name, floating_ip.ip)
                     server.add_floating_ip(floating_ip)
+                    log.debug("[%s] SUCCESS! Server id: %s", resource_handler.name, server.id)
+                    log.debug("[%s] List of floating IPs: %s", resource_handler.name, self.conn.floating_ips.list())
+                    log.debug("[%s] Associating floating ip (%s) to node: success. Took %i seconds.", resource_handler.name, floating_ip.ip, (attempts - 1) * flip_waiting)
+                    break
                 except Exception as e:
                     log.debug(e)
-                    time.sleep(3)
+                    log.debug("[%s] Associating floating ip (%s) to node failed. Retry after %i seconds...", resource_handler.name, floating_ip.ip, flip_waiting)
+                    time.sleep(flip_waiting)
                     attempts += 1
-                else:
-                    log.debug("[%s] Associating floating ip to node", resource_handler.name)
-                    break
-            if attempts == 20:
-                log.error("[%s] Failed to associate floating ip to node!", resource_handler.name)
+            if attempts > flip_attempts:
+                log.error("[%s] Gave up associating floating ip to node! Timeout was %i seconds.", resource_handler.name, flip_attempts * flip_waiting)
                 server = self.conn.servers.get(server.id)
                 self.conn.servers.delete(server)
                 raise Exception('Failed to associate floating ip to node!')
