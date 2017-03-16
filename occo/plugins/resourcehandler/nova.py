@@ -33,7 +33,7 @@ from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
 import itertools as it
 import logging
 import occo.constants.status as status
-from occo.exceptions import SchemaError
+from occo.exceptions import SchemaError, NodeCreationError
 
 __all__ = ['NovaResourceHandler']
 
@@ -116,55 +116,73 @@ class CreateNode(Command):
             nics = [{"net-id": network_id, "v4-fixed-ip": ''}]
         log.debug("[%s] Creating new server using image ID %r and flavor name %r",
             resource_handler.name, image_id, flavor_name)
-        server = self.conn.servers.create(server_name, image_id, flavor_name,
-            security_groups=sec_groups, key_name=key_name, userdata=context, nics=nics)
+        try:
+            server = self.conn.servers.create(server_name, image_id, flavor_name,
+                     security_groups=sec_groups, key_name=key_name, userdata=context, nics=nics)
+        except Exception as ex:
+            raise NodeCreationError(None, str(ex))
         log.debug('Reservation: %r, server ID: %r', server, server.id)
         return server
+
+    def _allocate_floating_ip(self, resource_handler,server):
+        pool = self.resolved_node_definition['resource'].get('floating_ip_pool', None)
+        if ('floating_ip' not in self.resolved_node_definition['resource']) and (pool is None):
+            return
+        flip_waiting = 5 
+        flip_attempts = 60
+        attempts = 1
+        while attempts <= flip_attempts:
+            unused_ips = [addr for addr in self.conn.floating_ips.list() \
+                         if addr.instance_id is None and ( not pool or pool == addr.pool) ]
+            if not unused_ips:
+                if pool is not None:
+                    error_msg = '[{0}] Cannot find unused floating ip address in pool "{1}"!'.format(
+                          resource_handler.name, pool)
+                else:
+                    error_msg = '[{0}] Cannot find unused floating ip address!'.format(
+                          resource_handler.name)
+                server = self.conn.servers.get(server.id)
+                self.conn.servers.delete(server)
+                raise NodeCreationError(None, error_msg)
+            log.debug("[%s] List of unused floating ips: %s", resource_handler.name, str([ ip.ip for ip in unused_ips]))
+            floating_ip = random.choice(unused_ips)
+            try:
+                log.debug("[%s] Try associating floating ip (%s) to node...", resource_handler.name, floating_ip.ip)
+                server.add_floating_ip(floating_ip)
+                log.debug("[%s] SUCCESS! Server id: %s", resource_handler.name, server.id)
+                log.debug("[%s] List of floating IPs: %s", resource_handler.name, self.conn.floating_ips.list())
+                log.debug("[%s] Associating floating ip (%s) to node: success. Took %i seconds.", resource_handler.name, floating_ip.ip, (attempts - 1) * flip_waiting)
+                break
+            except Exception as e:
+                log.debug(e)
+                log.debug("[%s] Associating floating ip (%s) to node failed. Retry after %i seconds...", resource_handler.name, floating_ip.ip, flip_waiting)
+                time.sleep(flip_waiting)
+                attempts += 1
+        if attempts > flip_attempts:
+            error_msg = '[{0}] Gave up associating floating ip to node! Could not get it in {1} seconds."'.format(
+                        resource_handler.name, flip_attempts * flip_waiting)
+            log.error(error_msg)
+            server = self.conn.servers.get(server.id)
+            self.conn.servers.delete(server)
+            raise NodeCreationError(None, error_msg)
+        return
 
     @wet_method(1)
     @needs_connection
     def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
                   resource_handler.name, self.resolved_node_definition['name'])
-       
-        server = self._start_instance(resource_handler, self.resolved_node_definition)
-        log.debug("[%s] Done; vm_id = %r", resource_handler.name, server.id)
-        
-        pool = self.resolved_node_definition['resource'].get('floating_ip_pool', None)
-        if ('floating_ip' in self.resolved_node_definition['resource']) or (pool is not None):
-            flip_waiting = 5 
-            flip_attempts = 60
-            attempts = 1
-            while attempts <= flip_attempts:
-                unused_ips = [addr for addr in self.conn.floating_ips.list() \
-                             if addr.instance_id is None and ( not pool or pool == addr.pool) ]
-                if not unused_ips:
-                    if pool is not None:
-                        msg = "Cannot find unused floating ip address in pool \"" + pool + "\"!"
-                    else:
-                        msg = "Cannot find unused floating ip address!"
-                    server = self.conn.servers.get(server.id)
-                    self.conn.servers.delete(server)
-                    raise Exception(msg)
-                log.debug("[%s] List of unused floating ips: %s", resource_handler.name, str([ ip.ip for ip in unused_ips]))
-                floating_ip = random.choice(unused_ips)
-                try:
-                    log.debug("[%s] Try associating floating ip (%s) to node...", resource_handler.name, floating_ip.ip)
-                    server.add_floating_ip(floating_ip)
-                    log.debug("[%s] SUCCESS! Server id: %s", resource_handler.name, server.id)
-                    log.debug("[%s] List of floating IPs: %s", resource_handler.name, self.conn.floating_ips.list())
-                    log.debug("[%s] Associating floating ip (%s) to node: success. Took %i seconds.", resource_handler.name, floating_ip.ip, (attempts - 1) * flip_waiting)
-                    break
-                except Exception as e:
-                    log.debug(e)
-                    log.debug("[%s] Associating floating ip (%s) to node failed. Retry after %i seconds...", resource_handler.name, floating_ip.ip, flip_waiting)
-                    time.sleep(flip_waiting)
-                    attempts += 1
-            if attempts > flip_attempts:
-                log.error("[%s] Gave up associating floating ip to node! Timeout was %i seconds.", resource_handler.name, flip_attempts * flip_waiting)
-                server = self.conn.servers.get(server.id)
+        try: 
+            server = self._start_instance(resource_handler, self.resolved_node_definition)
+            log.debug("[%s] Server instance created, id: %r", resource_handler.name, server.id)
+            self._allocate_floating_ip(resource_handler,server)
+        except KeyboardInterrupt:
+            log.info('Interrupting node creation! Rolling back. Please, stand by!')
+            try:
                 self.conn.servers.delete(server)
-                raise Exception('Failed to associate floating ip to node!')
+            except Exception as ex:
+                raise NodeCreationError(None, str(ex))
+            raise
         return server.id
 
 class DropNode(Command):
@@ -195,11 +213,15 @@ class DropNode(Command):
         :param instance_data: Information necessary to access the VM instance.
         :type instance_data: :ref:`Instance Data <instancedata>`
         """
-        instance_id = self.instance_data['instance_id']
+        instance_id = self.instance_data.get('instance_id')
+        if not instance_id:
+            return
         log.debug("[%s] Dropping node %r", resource_handler.name,
                   self.instance_data['node_id'])
-
-        self._delete_vms(resource_handler, instance_id)
+        try:
+            self._delete_vms(resource_handler, instance_id)
+        except Exception as ex:
+            raise NodeCreationError(None, str(ex))
 
         log.debug("[%s] Done", resource_handler.name)
 
@@ -214,7 +236,10 @@ class GetState(Command):
     def perform(self, resource_handler):
         log.debug("[%s] Acquiring node state %r",
                   resource_handler.name, self.instance_data['node_id'])
-        server = self.conn.servers.get(self.instance_data['instance_id'])
+        try: 
+            server = self.conn.servers.get(self.instance_data['instance_id'])
+        except Exception as ex:
+            raise NodeCreationError(None, str(ex))
         inst_state = server.status
         try:
             retval = STATE_MAPPING[inst_state]
@@ -237,7 +262,10 @@ class GetIpAddress(Command):
         log.debug("[%s] Acquiring IP address for %r",
                   resource_handler.name,
                   self.instance_data['node_id'])
-        server = self.conn.servers.get(self.instance_data['instance_id'])
+        try:
+            server = self.conn.servers.get(self.instance_data['instance_id'])
+        except Exception as ex:
+            raise NodeCreationError(None, str(ex))
         floating_ips = self.conn.floating_ips.list()
         for floating_ip in floating_ips:
             if floating_ip.instance_id == server.id:
@@ -280,7 +308,7 @@ class NovaResourceHandler(ResourceHandler):
               (((not "username" in auth_data) or (not "password" in auth_data)) and \
                ((not "type" in auth_data) or (not "proxy" in auth_data))):
               errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
-              raise Exception(errormsg)
+              raise NodeCreationError(None,errormsg)
         self.auth_data = auth_data
         self.data = config
 
