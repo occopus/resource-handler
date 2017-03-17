@@ -147,12 +147,20 @@ class CreateNode(Command):
             log.debug("[%s] List of unused floating ips: %s", resource_handler.name, str([ ip.ip for ip in unused_ips]))
             floating_ip = random.choice(unused_ips)
             try:
-                log.debug("[%s] Try associating floating ip (%s) to node...", resource_handler.name, floating_ip.ip)
+                log.debug("[%s] Try associating floating ip (%s) to server (%s)...", 
+                          resource_handler.name, floating_ip.ip, server.id)
                 server.add_floating_ip(floating_ip)
-                log.debug("[%s] SUCCESS! Server id: %s", resource_handler.name, server.id)
-                log.debug("[%s] List of floating IPs: %s", resource_handler.name, self.conn.floating_ips.list())
-                log.debug("[%s] Associating floating ip (%s) to node: success. Took %i seconds.", resource_handler.name, floating_ip.ip, (attempts - 1) * flip_waiting)
-                break
+                time.sleep(random.randint(1,5))
+                flips = self.conn.floating_ips.list()
+                log.debug("[%s] List of floating IPs: %s", resource_handler.name, flips)
+                myallocation = [ addr for addr in flips if addr.instance_id == server.id ]
+                if not myallocation:
+                    log.debug("SOMEONE took my ip meanwhile I was allocating it!")
+                    raise Exception
+                else:
+                    log.debug("ALLOCATION seemt to succeed: %r",myallocation[0])
+                    log.debug("[%s] Associating floating ip (%s) to node: success. Took %i seconds.", resource_handler.name, floating_ip.ip, (attempts - 1) * flip_waiting)
+                    break
             except Exception as e:
                 log.debug(e)
                 log.debug("[%s] Associating floating ip (%s) to node failed. Retry after %i seconds...", resource_handler.name, floating_ip.ip, flip_waiting)
