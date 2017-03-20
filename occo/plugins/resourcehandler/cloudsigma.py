@@ -61,7 +61,7 @@ class CreateNode(Command):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
 
-    @wet_method(1,"")
+    @wet_method(["uuid123",""])
     def _clone_drive(self, resource_handler, libdrive_id):
         r = requests.post(resource_handler.endpoint + '/libdrives/' + libdrive_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'clone'})
@@ -88,7 +88,7 @@ class CreateNode(Command):
         return None
         
 
-    @wet_method('unmounted',"")
+    @wet_method(['unmounted',""])
     def _get_drive_status(self, resource_handler, drv_id):
         r = requests.get(resource_handler.endpoint + '/drives/' + str(drv_id) + '/',
             auth=get_auth(resource_handler.auth_data))
@@ -100,7 +100,7 @@ class CreateNode(Command):
         log.debug('[%s] Status of drive %s is: %s', resource_handler.name, drv_id, st)
         return st, ""
 
-    @wet_method(1,"")
+    @wet_method([1,""])
     def _create_server(self, resource_handler, drv_id):
         """
         Start the VM instance.
@@ -151,7 +151,7 @@ class CreateNode(Command):
             return error_msg
         return None
 
-    @wet_method(True,"")
+    @wet_method([True,""])
     def _start_server(self, resource_handler, srv_id):
         r = requests.post(resource_handler.endpoint + '/servers/' + srv_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'start'})
@@ -161,7 +161,7 @@ class CreateNode(Command):
             return False, error_msg
         return True, ""
 
-    @wet_method(True)
+    @wet_method([True,""])
     def _stop_server(self, resource_handler, srv_id):
         r = requests.post(resource_handler.endpoint + '/servers/' + srv_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'stop'})
