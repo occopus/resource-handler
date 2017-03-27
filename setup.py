@@ -18,7 +18,7 @@ from pip.req import parse_requirements
 
 setuptools.setup(
     name='OCCO-ResourceHandler',
-    version='1.3',
+    version='1.4',
     author='MTA SZTAKI',
     author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
