@@ -21,13 +21,13 @@
 from __future__ import absolute_import
 import urlparse
 import occo.util.factory as factory
-from occo.util import wet_method, coalesce
+from occo.util import wet_method, coalesce, unique_vmname
 from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
 import itertools as it
 import logging
 import occo.constants.status as status
 import requests, json, uuid, time, base64
-from occo.exceptions import SchemaError
+from occo.exceptions import SchemaError, NodeCreationError
 
 __all__ = ['CloudSigmaResourceHandler']
 
@@ -46,6 +46,8 @@ def get_auth(auth_data):
     return (auth_data['email'], auth_data['password'])
 
 def get_server_json(resource_handler, srv_id):
+    if not srv_id:
+       return None 
     r = requests.get(resource_handler.endpoint + '/servers/' + srv_id + '/',
         auth=get_auth(resource_handler.auth_data))
     if r.status_code != 200:
@@ -59,40 +61,46 @@ class CreateNode(Command):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
 
-    @wet_method(1)
+    @wet_method(["uuid123",""])
     def _clone_drive(self, resource_handler, libdrive_id):
         r = requests.post(resource_handler.endpoint + '/libdrives/' + libdrive_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'clone'})
         if r.status_code != 202:
-            log.error('[%s] Cloning library drive %s failed with status code %d!', resource_handler.name, libdrive_id, r.status_code)
-            log.error('[%s] Response text: %s', resource_handler.name, r.text)
-            return None
+            error_msg = '[{0}] Cloning library drive {1} failed! Response code: {2}. Response message: {3}.'.format(
+                        resource_handler.name, libdrive_id, r.status_code, r.text)
+            return None, error_msg
         json_data = json.loads(r.text)
         uuid = json_data['objects'][0]['uuid']
         if uuid == None:
-            log.error('[%s] Cloning library drive %s failed: did not receive UUID!', resource_handler.name, libdrive_id)
-        return uuid
+            error_msg = '[{0}] Cloning library drive {1} failed: did not receive UUID!'.format(
+                        resource_handler.name, libdrive_id)
+            return None, error_msg
+        return uuid, ""
 
+    @wet_method()
     def _delete_drive(self, resource_handler, drv_id):
-        r = requests.delete(resource_handler.endpoint + '/drives/' + drv_id + '/',
+        r = requests.delete(resource_handler.endpoint + '/drives/' + str(drv_id) + '/',
             auth=get_auth(resource_handler.auth_data))
         if r.status_code != 204:
-            log.error('[%s] Deleting cloned drive %s failed with status code %d!', resource_handler.name, drv_id, r.status_code)
-            log.error('[%s] Response text: %s', resource_handler.name, r.text)
+            error_msg = '[{0}] Deleting cloned drive {1} failed! Response code: {2}. Response message: {3}'.format(
+                        resource_handler.name, drv_id, r.status_code, r.text)
+            return error_msg
+        return None
+        
 
-    @wet_method('unmounted')
+    @wet_method(['unmounted',""])
     def _get_drive_status(self, resource_handler, drv_id):
-        r = requests.get(resource_handler.endpoint + '/drives/' + drv_id + '/',
+        r = requests.get(resource_handler.endpoint + '/drives/' + str(drv_id) + '/',
             auth=get_auth(resource_handler.auth_data))
         if r.status_code != 200:
-            log.error('[%s] Failed to query drive status, response code: %d', resource_handler.name, r.status_code)
-            log.error('[%s] Response text: %s', resource_handler.name, r.text)
-            return 'unknown'
+            error_msg = '[{0}] Failed to query drive status! Response code: {1}. Response message: {2}.'.format(
+                        resource_handler.name, r.status_code, r.text)
+            return 'unknown', error_msg
         st = r.json()['status']
         log.debug('[%s] Status of drive %s is: %s', resource_handler.name, drv_id, st)
-        return st
+        return st, ""
 
-    @wet_method(1)
+    @wet_method([1,""])
     def _create_server(self, resource_handler, drv_id):
         """
         Start the VM instance.
@@ -108,16 +116,16 @@ class CreateNode(Command):
                 'cloudinit-user-data': base64.b64encode(context)
             }
         if 'vnc_password' not in descr:
-            descr['vnc_password'] = str(uuid.uuid4())
+            descr['vnc_password'] = self.resolved_node_definition.get('node_id', "occopus")
         if 'name' not in descr:
-            descr['name'] = str(uuid.uuid4())
+            descr['name'] = unique_vmname(self.resolved_node_definition)
         if 'drivers' not in descr:
             descr['drives'] = []
         nd = {
             "boot_order": 1,
             "dev_channel": "0:0",
             "device": "virtio",
-            "drive": drv_id
+            "drive": str(drv_id)
         }
         descr['drives'].append(nd)
         json_data = {}
@@ -125,45 +133,90 @@ class CreateNode(Command):
         r = requests.post(resource_handler.endpoint + '/servers/',
             auth=get_auth(resource_handler.auth_data), json=json_data)
         if r.status_code != 201:
-            log.error('[%s] Failed to create server, response code: %d', resource_handler.name, r.status_code)
-            log.error('[%s] Response text: %s', resource_handler.name, r.text)
-            return None
+            error_msg = '[{0}] Failed to create server! Response code: {1}. Response message: {2}.'.format(
+                        resource_handler.name, r.status_code, r.text)
+            return None, error_msg
         srv_uuid = r.json()['objects'][0]['uuid']
         log.debug('[%s] Created server\'s UUID is: %s', resource_handler.name, srv_uuid)
-        return srv_uuid
+        return srv_uuid, ""
 
-    @wet_method(True)
+    @wet_method()
+    def _delete_server(self, resource_handler, srv_id):
+        r = requests.delete(resource_handler.endpoint + '/servers/' + srv_id + '/',
+            auth=get_auth(resource_handler.auth_data), params={'recurse': 'all_drives'},
+            headers={'Content-type': 'application/json'})
+        if r.status_code != 204:
+            error_msg = '[{0}] Failed to delete server! Response code: {1}. Response text: {2}.'.format(
+                        resource_handler.name, r.status_code, r.text)
+            return error_msg
+        return None
+
+    @wet_method([True,""])
     def _start_server(self, resource_handler, srv_id):
         r = requests.post(resource_handler.endpoint + '/servers/' + srv_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'start'})
         if r.status_code != 202:
-            log.error('[%s] Failed to start server, response code: %d', resource_handler.name, r.status_code)
-            log.error('[%s] Response text: %s', resource_handler.name, r.text)
-            return False
-        return True
+            error_msg = '[{0}] Failed to start server! Response code: {1}. Response message: {2}.'.format(
+                        resource_handler.name, r.status_code, r.text)
+            return False, error_msg
+        return True, ""
+
+    @wet_method([True,""])
+    def _stop_server(self, resource_handler, srv_id):
+        r = requests.post(resource_handler.endpoint + '/servers/' + srv_id + '/action/',
+            auth=get_auth(resource_handler.auth_data), params={'do': 'stop'})
+        if r.status_code != 202:
+             error_msg = '[{0}] Failed to stop server! Response code: {1}. Response text: {2}.'.format(
+                         resource_handler.name, r.status_code, r.text)
+             return False, error_msg
+        return True, ""
 
     def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
                   resource_handler.name, self.resolved_node_definition['name'])
-
-        drv_id = self._clone_drive(resource_handler, self.resolved_node_definition['resource']['libdrive_id'])
-        drv_st = 'unknown'
-        steps = 0
-        sval = 1
-        while drv_st != 'unmounted' and steps < 5:
-            drv_st = self._get_drive_status(resource_handler, drv_id)
-            time.sleep(sval)
-            steps += 1
-            sval *=  2
-        if steps == 5 and drv_st != 'unmounted':
-            log.error('[%s] Cloned drive failed to enter unmounted status, aborting', resource_handler.name)
-            self._delete_drive(resource_handler, drv_id)
-            return None
-
-        srv_id = self._create_server(resource_handler, drv_id)
-        while True != self._start_server(resource_handler, srv_id):
-            time.sleep(5)
-
+        drv_id, srv_id = None, None
+        try:
+            drv_id, errormsg = self._clone_drive(resource_handler, self.resolved_node_definition['resource']['libdrive_id'])
+            if not drv_id:
+                log.error(errormsg)
+                raise NodeCreationError(None, errormsg)
+            drv_st, errormsg = self._get_drive_status(resource_handler, drv_id)
+            while drv_st == 'cloning_dst':
+                log.debug("[%s] Waiting for cloned drive to enter unmounted state, currently %r",resource_handler.name, drv_st)
+                time.sleep(5)
+                drv_st, errormsg = self._get_drive_status(resource_handler, drv_id)
+            if drv_st != 'unmounted' or drv_st == 'unknown':
+                log.error(errormsg)
+                self._delete_drive(resource_handler, drv_id)
+                raise NodeCreationError(None, errormsg)
+            srv_id, errormsg = self._create_server(resource_handler, drv_id)
+            if not srv_id:
+                log.error(errormsg)
+                self._delete_drive(resource_handler, drv_id)
+                raise NodeCreationError(None, errormsg)
+            ret, errormsg = self._start_server(resource_handler, srv_id)
+            while not ret:
+                log.debug(errormsg)
+                time.sleep(5)
+                ret, errormsg = self._start_server(resource_handler, srv_id)
+        except KeyboardInterrupt:
+            log.info('Interrupting node creation! Rolling back. Please, stand by!')
+            if srv_id:
+                srv_st = get_server_json(resource_handler, srv_id)['status']
+                while srv_st != 'stopped':
+                    log.debug("[%s] Server is in %s state.",resource_handler.name, srv_st)
+                    time.sleep(5)
+                    self._stop_server(resource_handler, srv_id)
+                    srv_st = get_server_json(resource_handler, srv_id)['status']
+                self._delete_server(resource_handler, srv_id)
+            if drv_id:
+                drv_st, _ = self._get_drive_status(resource_handler, drv_id)
+                while drv_st not in ['unmounted','unknown']:
+                    log.debug("[%s] Drive is in %s state.",resource_handler.name, drv_st)
+                    time.sleep(5)
+                    drv_st, _ = self._get_drive_status(resource_handler, drv_id)
+                self._delete_drive(resource_handler, drv_id)
+            raise
         return srv_id
 
 class DropNode(Command):
@@ -171,20 +224,26 @@ class DropNode(Command):
         Command.__init__(self)
         self.instance_data = instance_data
 
+    @wet_method(True)
     def _stop_server(self, resource_handler, srv_id):
         r = requests.post(resource_handler.endpoint + '/servers/' + srv_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'stop'})
         if r.status_code != 202:
-            log.error('[%s] Failed to delete server, response code: %d', resource_handler.name, r.status_code)
-            log.error('[%s] Response text: %s', resource_handler.name, r.text)
+             error_msg = '[{0}] Failed to stop server! Response code: {1}. Response text: {2}.'.format(
+                         resource_handler.name, r.status_code, r.text)
+             return False, error_msg
+        return True, ""
 
+    @wet_method()
     def _delete_server(self, resource_handler, srv_id):
         r = requests.delete(resource_handler.endpoint + '/servers/' + srv_id + '/',
             auth=get_auth(resource_handler.auth_data), params={'recurse': 'all_drives'},
             headers={'Content-type': 'application/json'})
         if r.status_code != 204:
-            log.error('[%s] Failed to delete server, response code: %d', resource_handler.name, r.status_code)
-            log.error('[%s] Response text: %s', resource_handler.name, r.text)
+            error_msg = '[{0}] Failed to delete server! Response code: {1}. Response text: {2}.'.format(
+                        resource_handler.name, r.status_code, r.text)
+            return error_msg
+        return None
 
     @wet_method()
     def perform(self, resource_handler):
@@ -194,16 +253,22 @@ class DropNode(Command):
         :param instance_data: Information necessary to access the VM instance.
         :type instance_data: :ref:`Instance Data <instancedata>`
         """
-        srv_id = self.instance_data['instance_id']
+        srv_id = self.instance_data.get('instance_id')
+        if not srv_id:
+            return
+        
         log.debug("[%s] Deleting server %r", resource_handler.name,
                 self.instance_data['node_id'])
 
-        self._stop_server(resource_handler, srv_id)
-        while 'stopped' != get_server_json(resource_handler, srv_id)['status']:
+        srv_st = get_server_json(resource_handler, srv_id)['status']
+        while srv_st != 'stopped':
+            log.debug("[%s] Server is in %s state. Try stopping it...",resource_handler.name, srv_st)
+            self._stop_server(resource_handler, srv_id)
             time.sleep(5)
+            srv_st = get_server_json(resource_handler, srv_id)['status']
         self._delete_server(resource_handler, srv_id)
 
-        log.debug("[%s] Done", resource_handler.name)
+        log.debug("[%s] Deleting server: done", resource_handler.name)
 
 class GetState(Command):
     def __init__(self, instance_data):

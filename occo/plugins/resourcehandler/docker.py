@@ -38,7 +38,7 @@ class CreateNode(Command):
         Command.__init__(self)
         self.resolved_node_definition = resolved_node_definition
         self.origin = self.resolved_node_definition['resource']['origin']
-        self.network_mode = self.resolved_node_definition['resource']['network_mode']
+        #self.network_mode = self.resolved_node_definition['resource']['network_mode']
         self.image = self.resolved_node_definition['resource']['image']
         self.tag = self.resolved_node_definition['resource']['tag']
 
@@ -54,11 +54,11 @@ class CreateNode(Command):
         """
         log.debug('Starting container')
         cli = resource_handler.cli
-        host_config=cli.create_host_config(network_mode=self.network_mode)
+        #host_config=cli.create_host_config(network_mode=self.network_mode)
         container = cli.create_container(
             image='{0.image}:{0.tag}'.format(self),
             command=self.command,
-            host_config=host_config,
+            #host_config=host_config,
             environment=self.env
         )
 
@@ -223,7 +223,8 @@ class DockerResourceHandler(ResourceHandler):
 @factory.register(RHSchemaChecker, PROTOCOL_ID)
 class DockerSchemaChecker(RHSchemaChecker):
     def __init__(self):
-        self.req_keys = ["type", "endpoint", "origin", "network_mode", "image", "tag"]
+        #self.req_keys = ["type", "endpoint", "origin", "network_mode", "image", "tag"]
+        self.req_keys = ["type", "endpoint", "origin", "image", "tag"]
         self.opt_keys = ["name"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
