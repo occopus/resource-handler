@@ -171,17 +171,7 @@ class GetState(Command):
     @wet_method(status.READY)
     def perform(self, resource_handler):
         instance = get_instance(resource_handler, self.instance_data['instance_id'])
-        #r = requests.get(resource_handler.endpoint + '/instances/' +
-        #        self.instance_data['instance_id'] + '.xml',
-        #        auth=get_auth(resource_handler.auth_data))
-        #log.debug('[%s] CloudBroker instance status response status code %d, response: %s',
-        #    resource_handler.name, r.status_code, r.text)
-        #if (r.status_code != 200):
-        #    return status.TMP_FAIL
-        #DOMTree = xml.dom.minidom.parseString(r.text)
-        #instance = DOMTree.documentElement
         stat = getTagText(instance.getElementsByTagName('status').item(0).childNodes)
-        log.debug(stat)
         statusMap = {
             u'starting': status.PENDING,
             u'initializing': status.PENDING,
