@@ -15,7 +15,7 @@
 """ Boto EC2 implementation of the
 :class:`~occo.resourcehandler.resourcehandler.ResourceHandler` class.
 
-.. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>
+.. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>, Jozsef Kovacs <jozsef.kovacs@sztaki.mta.hu>
 """
 
 # To avoid self-importing *this* ec2.py module (we need the "real" one
@@ -30,7 +30,7 @@ from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
 import itertools as it
 import logging
 import occo.constants.status as status
-from occo.exceptions import SchemaError
+from occo.exceptions import SchemaError,NodeCreationError
 
 __all__ = ['EC2ResourceHandler']
 
@@ -242,7 +242,8 @@ class EC2ResourceHandler(ResourceHandler):
         self.regionname = regionname
         if (not auth_data) or (not "accesskey" in auth_data) or (not "secretkey" in auth_data):
            errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
-           raise Exception(errormsg)
+           log.debug(errormsg)
+           raise NodeCreationError(None, errormsg)
         self.auth_data = auth_data
 
     def get_connection(self):
