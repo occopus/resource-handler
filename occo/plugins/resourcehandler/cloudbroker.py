@@ -33,7 +33,7 @@ from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement, tostring
 from time import sleep
 import xml.etree.ElementTree as ET
-from occo.exceptions import SchemaError
+from occo.exceptions import SchemaError, NodeCreationError
 from dicttoxml import dicttoxml
 
 __all__ = ['CloudBrokerResourceHandler']
@@ -42,32 +42,35 @@ PROTOCOL_ID='cloudbroker'
 
 log = logging.getLogger('occo.resourcehandler.cloudbroker')
 
-def get_instance(conn, instance_id):
-    reservations = conn.get_all_reservations(instance_ids=[instance_id])
-    # TODO: ASSUMING len(reservations)==1 and len(instances)==1
-    return reservations[0].instances[0]
-
 def get_auth(auth_data):
     return (auth_data['email'], auth_data['password'])
 
 def get_instance(resource_handler, instanceid):
     attempt = 0
     stime = 1
-    while attempt < 3:
-        r = requests.get(resource_handler.endpoint + '/instances/' + instanceid + '.xml',
-                auth=get_auth(resource_handler.auth_data))
-        log.debug('[%s] CloudBroker instance status response status code %d, response: %s',
-            resource_handler.name, r.status_code, r.text)
+    while attempt < 5:
+        query_str = resource_handler.endpoint + '/instances/' + instanceid + '.xml'
+        r = requests.get(query_str, auth=get_auth(resource_handler.auth_data))
         if (r.status_code != 200):
-            return None
-        DOMTree = xml.dom.minidom.parseString(r.text)
-        instance = DOMTree.documentElement
-        if 0 != instance.getElementsByTagName('id').length:
-            return instance
+            log.debug('[%s] CloudBroker API call failed! query: %s, status code %d, response: %s',
+                      resource_handler.name, query_str, r.status_code, r.text)
+        else:
+            DOMTree = xml.dom.minidom.parseString(r.text)
+            instance = DOMTree.documentElement
+            if 0 != instance.getElementsByTagName('id').length:
+                return instance
+            else:
+                log.debug('[%s] CloudBroker API returned incorrect answer! No instance id is found.',
+                          resource_handler.name, query_str, r.status_code, r.text)
         sleep(stime)
         stime = stime * 2
         attempt += 1
-    raise Exception()
+        log.debug('[%s] Retry calling the CloudBroker API...',
+                  resource_handler.name)
+    errormsg = 'Error in querying instance \'{0}\' {1} times through CloudBroker API at \'{2}\'.'.format(
+               str(instanceid), str(attempt), resource_handler.endpoint)
+    log.debug(errormsg)
+    raise Exception(errormsg)
 
 def getTagText(nodelist):
     rc = []
@@ -85,40 +88,35 @@ class CreateNode(Command):
     @wet_method(1)
     def _start_instance(self, resource_handler):
         """
-        Start the CloudBroker job.
-
-        :param str software_id: The identifier of the Software in CloudBroker.
-        :param str executable_id: The identifier of the Executable in CloudBroker.
-        :param str resource_id: The identifier of the Resource in CloudBroker.
-        :param str region_id: The identifier of the Region in CloudBroker.
-        :param str instance_type_id: The identifier of the instance type in CloudBroker.
-        :param list files: List of files to be uploaded for the job
-
-        :Remark: This is a "wet method", the job will not be started
-            if the instance is in debug mode (``dry_run``).
+        Start a CloudBroker instance.
         """
         log.debug("[%s] Creating CloudBroker instance...", resource_handler.name)
         descr = self.resolved_node_definition['resource']['description']
+        descr.setdefault('disable_autostop', 'true')
+        descr.setdefault('isolated', 'true')
         context = self.resolved_node_definition.get('context', None)
         if context is not None:
             descr['cloud-init'] = base64.b64encode(context)
             descr['cloud-init-b64'] = 'true'
-        log.debug("[%s] XML to pass to CloudBroker: %s", resource_handler.name, dicttoxml(descr, custom_root='instance', attr_type=False))
-        r = requests.post(resource_handler.endpoint + '/instances.xml', dicttoxml(descr, custom_root='instance', attr_type=False),
-            auth=get_auth(resource_handler.auth_data),
-            headers={'Content-Type': 'application/xml'})
+        log.debug("[%s] XML to pass to CloudBroker: %s", 
+                  resource_handler.name, dicttoxml(descr, custom_root='instance', attr_type=False))
+        r = requests.post(resource_handler.endpoint + '/instances.xml', 
+                          dicttoxml(descr, custom_root='instance', attr_type=False),
+                          auth=get_auth(resource_handler.auth_data),
+                          headers={'Content-Type': 'application/xml'})
         log.debug('[%s] CloudBroker instance create response status code %d, response: %s',
-            resource_handler.name, r.status_code, r.text)
+                  resource_handler.name, r.status_code, r.text)
         if (r.status_code == 201):
             DOMTree = xml.dom.minidom.parseString(r.text)
             instance = DOMTree.documentElement
             instanceID = instance.getElementsByTagName('id')[0].childNodes[0].data
-            log.info("[%s] CloudBroker instance started: %s", resource_handler.name, instanceID)
+            log.debug("[%s] CloudBroker instance started, internal id: %s", resource_handler.name, instanceID)
+            return instanceID
         else:
-            log.error('[%s] Failed to create CloudBroker instance, request status code %d, response: %s',
-                resource_handler.name, r.status_code, r.text)
-            instanceID = None
-        return instanceID
+            errormsg = '[{0}] Failed to create CloudBroker instance, request status code {1}, response: {2}'.format(
+                       resource_handler.name, r.status_code, r.text)
+            log.debug(errormsg)
+            raise NodeCreationError(None, errormsg) 
 
     def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
@@ -155,7 +153,10 @@ class DropNode(Command):
         :param instance_data: Information necessary to access the VM instance.
         :type instance_data: :ref:`Instance Data <instancedata>`
         """
-        instance_id = self.instance_data['instance_id']
+        instance_id = self.instance_data.get('instance_id')
+        if not instance_id:
+            return
+
         log.debug("[%s] Dropping node %r", resource_handler.name,
                 self.instance_data['node_id'])
 
@@ -181,9 +182,9 @@ class GetState(Command):
             u'halted': status.SHUTDOWN,
         }
         retval = statusMap.get(stat)
-        if retval is not None:
-            return retval
-        raise NotImplementedError()
+        if not retval:
+            raise NotImplementedError()
+        return retval
 
 class GetIpAddress(Command):
     def __init__(self, instance_data):
@@ -241,7 +242,8 @@ class CloudBrokerResourceHandler(ResourceHandler):
         self.name = name if name else endpoint
         if (not auth_data) or (not "email" in auth_data) or (not "password" in auth_data):
            errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
-           raise Exception(errormsg)
+           log.debug(errormsg)
+           raise NodeCreationError(None, errormsg)
         self.endpoint = endpoint if not dry_run else None
         self.auth_data = auth_data if not dry_run else None
 
