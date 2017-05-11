@@ -26,14 +26,15 @@ from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
 import itertools as it
 import logging
 import occo.constants.status as status
-import requests, json, uuid
+import requests, json, uuid, base64
 import xml.dom.minidom
 from xml.dom.minidom import parseString
 from xml.etree import ElementTree
 from xml.etree.ElementTree import Element, SubElement, tostring
 from time import sleep
 import xml.etree.ElementTree as ET
-from occo.exceptions import SchemaError
+from occo.exceptions import SchemaError, NodeCreationError
+from dicttoxml import dicttoxml
 
 __all__ = ['CloudBrokerResourceHandler']
 
@@ -41,29 +42,35 @@ PROTOCOL_ID='cloudbroker'
 
 log = logging.getLogger('occo.resourcehandler.cloudbroker')
 
-def get_instance(conn, instance_id):
-    reservations = conn.get_all_reservations(instance_ids=[instance_id])
-    # TODO: ASSUMING len(reservations)==1 and len(instances)==1
-    return reservations[0].instances[0]
-
 def get_auth(auth_data):
     return (auth_data['email'], auth_data['password'])
 
-def get_instance(resource_handler, jobid):
+def get_instance(resource_handler, instanceid):
     attempt = 0
     stime = 1
-    while attempt < 3:
-        r = requests.get(resource_handler.endpoint + '/instances.xml',
-                auth=get_auth(resource_handler.auth_data), params={'job_id': jobid})
+    while attempt < 5:
+        query_str = resource_handler.endpoint + '/instances/' + instanceid + '.xml'
+        r = requests.get(query_str, auth=get_auth(resource_handler.auth_data))
         if (r.status_code != 200):
-            return None
-        DOMTree = xml.dom.minidom.parseString(r.text)
-        instance = DOMTree.documentElement
-        if 0 != instance.getElementsByTagName('instance').length:
-            return instance
+            log.debug('[%s] CloudBroker API call failed! query: %s, status code %d, response: %s',
+                      resource_handler.name, query_str, r.status_code, r.text)
+        else:
+            DOMTree = xml.dom.minidom.parseString(r.text)
+            instance = DOMTree.documentElement
+            if 0 != instance.getElementsByTagName('id').length:
+                return instance
+            else:
+                log.debug('[%s] CloudBroker API returned incorrect answer! No instance id is found.',
+                          resource_handler.name, query_str, r.status_code, r.text)
         sleep(stime)
         stime = stime * 2
-    raise Exception()
+        attempt += 1
+        log.debug('[%s] Retry calling the CloudBroker API...',
+                  resource_handler.name)
+    errormsg = 'Error in querying instance \'{0}\' {1} times through CloudBroker API at \'{2}\'.'.format(
+               str(instanceid), str(attempt), resource_handler.endpoint)
+    log.debug(errormsg)
+    raise Exception(errormsg)
 
 def getTagText(nodelist):
     rc = []
@@ -78,139 +85,46 @@ class CreateNode(Command):
         self.resolved_node_definition = resolved_node_definition
         self.input_type_id = None
 
-    def _get_input_type_id(self, resource_handler):
-        """Get the ID of the data file type 'input' from CloudBroker."""
-        log.debug("[%s] Determining ID of input data type...", resource_handler.name)
-        if self.input_type_id == None:
-            dtypes = requests.get(resource_handler.endpoint + '/data_types.xml',
-                auth=get_auth(resource_handler.auth_data))
-            data_types = ET.fromstring(dtypes.text)
-            for data_type in data_types.findall('data-type'):
-                name = data_type.find('name').text
-                dtid = data_type.find('id').text
-                if name == 'input':
-                    return dtid
-            else:
-                log.error("[%s] Could not determine data file ID for input files.", resource_handler.name)
-                raise NotImplementedError()
-
-    def _upload_file_with_content(self, resource_handler, job_id, filename, content):
-        """
-        Upload a data file for the CloudBroker job by providing the content
-
-        :param str job_id: The identifier of the job in CloudBroker.
-        :param str filename: The name of the DataFile.
-        :param str content: The content to upload.
-        """
-        log.info("[%s] Uploading file %s with content...", resource_handler.name, filename)
-        files = {'data': (filename, content)}
-        payload = {'job_id': job_id, 'archive': 'false', 'data_type_id': self.input_type_id}
-        req = requests.post(resource_handler.endpoint + '/data_files.xml',
-            auth=get_auth(resource_handler.auth_data), data=payload, files=files)
-
-    def _upload_file_with_location(self, resource_handler, job_id, filename, location):
-        """
-        Upload a data file for the CloudBroker job from a given path
-
-        :param str job_id: The identifier of the job in CloudBroker.
-        :param str filename: The name of the DataFile.
-        :param str location: The path of the file to upload.
-        """
-        log.info("[%s] Uploading file %s with file from path...", resource_handler.name, filename)
-        files = {'data': (filename, open(location, 'rb'))}
-        payload = {'job_id': job_id, 'archive': 'false', 'data_type_id': self.input_type_id}
-        req = requests.post(resource_handler.endpoint + '/data_files.xml',
-            auth=get_auth(resource_handler.auth_data), data=payload, files=files)
-
-    def _handle_file(self, resource_handler, job_id, file_info):
-        """
-        Handle a file's upload to CloudBroker. The given file may be defined
-        either using its content or using the location of the file on the
-        filesystem.
-
-        :param str job_id: The identifier of the job
-        :param dict file_info: Dictionary discribing the file
-        """
-        filename = file_info['file_name']
-        if 'content' in file_info:
-            self._upload_file_with_content(resource_handler, job_id, filename, file_info['content'])
-        elif 'path' in file_info:
-            self._upload_file_with_location(resource_handler, job_id, filename, file_info['path'])
-
     @wet_method(1)
-    def _start_job(self, resource_handler, software_id, executable_id, resource_id, region_id, instance_type_id, files):
+    def _start_instance(self, resource_handler):
         """
-        Start the CloudBroker job.
-
-        :param str software_id: The identifier of the Software in CloudBroker.
-        :param str executable_id: The identifier of the Executable in CloudBroker.
-        :param str resource_id: The identifier of the Resource in CloudBroker.
-        :param str region_id: The identifier of the Region in CloudBroker.
-        :param str instance_type_id: The identifier of the instance type in CloudBroker.
-        :param list files: List of files to be uploaded for the job
-
-        :Remark: This is a "wet method", the job will not be started
-            if the instance is in debug mode (``dry_run``).
+        Start a CloudBroker instance.
         """
-        log.debug("[%s] Creating CloudBroker job...", resource_handler.name)
-        self.input_type_id = self._get_input_type_id(resource_handler)
-        jobxml = Element('job')
-        name = SubElement(jobxml, 'name')
-        name.text = str(uuid.uuid4())
-        sid = SubElement(jobxml, 'software-id')
-        sid.text = software_id
-        eid = SubElement(jobxml, 'executable-id')
-        eid.text = executable_id
-        resid = SubElement(jobxml, 'resource-id')
-        resid.text = resource_id
-        regid = SubElement(jobxml, 'region-id')
-        regid.text = region_id
-        itid = SubElement(jobxml, 'instance-type-id')
-        itid.text = instance_type_id
-        prtag = SubElement(jobxml, 'permanently-running')
-        prtag.text = 'true'
-        r = requests.post(resource_handler.endpoint + '/jobs.xml', tostring(jobxml),
-            auth=get_auth(resource_handler.auth_data),
-            headers={'Content-Type': 'application/xml'})
+        log.debug("[%s] Creating CloudBroker instance...", resource_handler.name)
+        descr = self.resolved_node_definition['resource']['description']
+        descr.setdefault('disable_autostop', 'true')
+        descr.setdefault('isolated', 'true')
+        context = self.resolved_node_definition.get('context', None)
+        if context is not None:
+            descr['cloud-init'] = base64.b64encode(context)
+            descr['cloud-init-b64'] = 'true'
+        log.debug("[%s] XML to pass to CloudBroker: %s", 
+                  resource_handler.name, dicttoxml(descr, custom_root='instance', attr_type=False))
+        r = requests.post(resource_handler.endpoint + '/instances.xml', 
+                          dicttoxml(descr, custom_root='instance', attr_type=False),
+                          auth=get_auth(resource_handler.auth_data),
+                          headers={'Content-Type': 'application/xml'})
+        log.debug('[%s] CloudBroker instance create response status code %d, response: %s',
+                  resource_handler.name, r.status_code, r.text)
         if (r.status_code == 201):
             DOMTree = xml.dom.minidom.parseString(r.text)
-            job = DOMTree.documentElement
-            jobid = job.getElementsByTagName('id')[0].childNodes[0].data
-            log.debug("[%s] CloudBroker job created: %s, now uploading any input files.", resource_handler.name, jobid)
-            for file_info in files:
-                self._handle_file(resource_handler, jobid, file_info)
-            log.debug("[%s] Submitting CloudBroker job...", resource_handler.name)
-            rsubmit = requests.put(resource_handler.endpoint + '/jobs/' +
-                jobid + '/submit.xml', auth=get_auth(resource_handler.auth_data))
-            if (rsubmit.status_code != 200):
-                rdelete = requests.delete(resource_handler.endpoint + '/jobs/' +
-                    jobid + '.xml', auth=get_auth(resource_handler.auth_data))
-                jobid = None
-            log.debug("[%s] CloudBroker job submitted!", resource_handler.name)
+            instance = DOMTree.documentElement
+            instanceID = instance.getElementsByTagName('id')[0].childNodes[0].data
+            log.debug("[%s] CloudBroker instance started, internal id: %s", resource_handler.name, instanceID)
+            return instanceID
         else:
-            jobid = None
-        return jobid
+            errormsg = '[{0}] Failed to create CloudBroker instance, request status code {1}, response: {2}'.format(
+                       resource_handler.name, r.status_code, r.text)
+            log.debug(errormsg)
+            raise NodeCreationError(None, errormsg) 
 
     def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
                 resource_handler.name, self.resolved_node_definition['name'])
         resource = self.resolved_node_definition['resource']
-        software_id = resource['software_id']
-        executable_id = resource['executable_id']
-        resource_id = resource['resource_id']
-        region_id = resource['region_id']
-        instance_type_id = resource['instance_type_id']
-        files = []
-        if 'template_files' in self.resolved_node_definition:
-            files += self.resolved_node_definition['template_files']
-        if 'files' in self.resolved_node_definition:
-            files += self.resolved_node_definition['files']
-
-        job_id = self._start_job(resource_handler, software_id, executable_id,
-            resource_id, region_id, instance_type_id, files)
-
-        log.debug("[%s] Done; job_id = %r", resource_handler.name, job_id)
-        return job_id
+        instanceID = self._start_instance(resource_handler)
+        log.debug("[%s] Done; instanceID = %r", resource_handler.name, instanceID)
+        return instanceID
 
 class DropNode(Command):
     def __init__(self, instance_data):
@@ -218,18 +132,18 @@ class DropNode(Command):
         self.instance_data = instance_data
 
     @wet_method()
-    def _delete_vms(self, resource_handler, *job_ids):
+    def _delete_vms(self, resource_handler, *instance_ids):
         """
-        Terminate CloudBroker job instances.
+        Terminate CloudBroker instances.
 
-        :param job_ids: The list of CloudBroker job identifiers.
-        :type job_ids: str
+        :param instance_ids: The list of CloudBroker instance identifiers.
+        :type instance_ids: str
 
         :Remark: This is a "wet method", termination will not be attempted
             if the instance is in debug mode (``dry_run``).
         """
-        for job_id in job_ids:
-            r = requests.put(resource_handler.endpoint + '/jobs/' + job_id + '/stop',
+        for instance_id in instance_ids:
+            r = requests.put(resource_handler.endpoint + '/instances/' + instance_id + '/stop',
                 auth=get_auth(resource_handler.auth_data))
 
     def perform(self, resource_handler):
@@ -239,7 +153,10 @@ class DropNode(Command):
         :param instance_data: Information necessary to access the VM instance.
         :type instance_data: :ref:`Instance Data <instancedata>`
         """
-        instance_id = self.instance_data['instance_id']
+        instance_id = self.instance_data.get('instance_id')
+        if not instance_id:
+            return
+
         log.debug("[%s] Dropping node %r", resource_handler.name,
                 self.instance_data['node_id'])
 
@@ -254,29 +171,20 @@ class GetState(Command):
 
     @wet_method(status.READY)
     def perform(self, resource_handler):
-        r = requests.get(resource_handler.endpoint + '/jobs/' +
-                self.instance_data['instance_id'] + '.xml',
-                auth=get_auth(resource_handler.auth_data))
-        if (r.status_code != 200):
-            return status.TMP_FAIL
-        DOMTree = xml.dom.minidom.parseString(r.text)
-        job = DOMTree.documentElement
-        retval = job.getElementsByTagName('status')[0].childNodes[0].data
-        if retval=="created" or retval=="submitted" or retval=="assembling" or \
-                retval=="starting" or retval=="preparing":
-                    log.debug("[%s] Done; retval=%r; status=%r",resource_handler.name,
-                            retval, status.PENDING)
-                    return status.PENDING
-        elif retval=="running":
-            log.debug("[%s] Done; retval=%r; status=%r",resource_handler.name,
-                    retval, status.READY)
-            return status.READY
-        elif retval=="stopping" or retval=="finishing" or retval=="completed":
-            log.debug("[%s] Done; retval=%r; status=%r",resource_handler.name,
-                    retval, status.SHUTDOWN)
-            return status.SHUTDOWN
-        else:
+        instance = get_instance(resource_handler, self.instance_data['instance_id'])
+        stat = getTagText(instance.getElementsByTagName('status').item(0).childNodes)
+        statusMap = {
+            u'starting': status.PENDING,
+            u'initializing': status.PENDING,
+            u'preparing': status.PENDING,
+            u'running': status.READY,
+            u'stopping': status.SHUTDOWN,
+            u'halted': status.SHUTDOWN,
+        }
+        retval = statusMap.get(stat)
+        if not retval:
             raise NotImplementedError()
+        return retval
 
 class GetIpAddress(Command):
     def __init__(self, instance_data):
@@ -334,7 +242,8 @@ class CloudBrokerResourceHandler(ResourceHandler):
         self.name = name if name else endpoint
         if (not auth_data) or (not "email" in auth_data) or (not "password" in auth_data):
            errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
-           raise Exception(errormsg)
+           log.debug(errormsg)
+           raise NodeCreationError(None, errormsg)
         self.endpoint = endpoint if not dry_run else None
         self.auth_data = auth_data if not dry_run else None
 
@@ -359,12 +268,17 @@ class CloudBrokerResourceHandler(ResourceHandler):
 @factory.register(RHSchemaChecker, PROTOCOL_ID)
 class CloudbrokerSchemaChecker(RHSchemaChecker):
     def __init__(self):
-        self.req_keys = ["type", "endpoint", "region_id", "resource_id", "software_id", "instance_type_id", "executable_id" ]
+        self.req_keys = ["type", "endpoint", "description"]
+        self.req_desc_keys = ["deployment_id", "instance_type_id"]
         self.opt_keys = ["name"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
             msg = "Missing key(s): " + ', '.join(str(key) for key in missing_keys)
+            raise SchemaError(msg)
+        missing_keys = RHSchemaChecker.get_missing_keys(self, data['description'], self.req_desc_keys)
+        if missing_keys:
+            msg = "Missing key(s) in description: " + ', '.join(str(key) for key in missing_keys)
             raise SchemaError(msg)
         valid_keys = self.req_keys + self.opt_keys
         invalid_keys = RHSchemaChecker.get_invalid_keys(self, data, valid_keys)
