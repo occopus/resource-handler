@@ -58,11 +58,6 @@ def setup_connection(endpoint, auth_data, resolved_node_definition):
     tenant_name = resolved_node_definition['resource'].get('tenant_name', None)
     project_id = resolved_node_definition['resource'].get('project_id', None)
     user_domain_name = resolved_node_definition['resource'].get('user_domain_name', 'Default')
-    if (not auth_data) or \
-       (((not "username" in auth_data) or (not "password" in auth_data)) and \
-       ((not "type" in auth_data) or (not "proxy" in auth_data))):
-       errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
-       raise NodeCreationError(None,errormsg)
     if auth_data.get('type',None) is None:
         user = auth_data['username']
         password = auth_data['password']
@@ -317,6 +312,10 @@ class NovaResourceHandler(ResourceHandler):
         self.dry_run = dry_run
         self.name = name if name else endpoint
         self.endpoint = endpoint
+        if (not auth_data) or (((not "username" in auth_data) or (not "password" in auth_data)) and \
+            ((not "type" in auth_data) or (not "proxy" in auth_data))):
+            errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
+            raise NodeCreationError(None,errormsg)
         self.auth_data = auth_data
         self.data = config
 
