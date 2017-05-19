@@ -99,7 +99,6 @@ class GracefulInterruptHandler(object):
         self.released = False
         self.original_handler = signal.getsignal(self.sig)
         def handler(signum, frame):
-            self.release()
             self.interrupted = True
         signal.signal(self.sig, handler)
         return self
@@ -142,10 +141,11 @@ class CreateNode(Command):
             server = None
             KBinterrupt = False
             with GracefulInterruptHandler() as h:
+                log.debug('Server creation started for node %s...', node_def['node_id'])
                 server = self.conn.servers.create(server_name, image_id, flavor_name,
                      security_groups=sec_groups, key_name=key_name, userdata=context, nics=nics)
                 KBinterrupt = h.interrupted
-                log.debug('Reservation: %r, server ID: %r', server, server.id)
+                log.debug('Server creation finished for node %s: server: %r', node_def['node_id'], server)
             if KBinterrupt:
               log.debug('Keyboard interrupt detected while VM was being created!')
               raise KeyboardInterrupt
