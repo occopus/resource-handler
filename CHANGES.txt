@@ -1,3 +1,8 @@
+v1.5 - May 2017
+- Improve error handling and logging in cloudsigma, ec2 and occi plugins
+- Reimplemented cloudbroker plugin: handle instances, not jobs
+- Improve nova plugin to handle interruption
+
 v1.4 - March 2017
 - Deprecate network_mode attribute in docker plugin
 - Improve cloudsigma plugin
