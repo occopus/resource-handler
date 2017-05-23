@@ -239,6 +239,7 @@ class OCCIResourceHandler(ResourceHandler):
         self.name = name if name else endpoint
         if (not auth_data) or (not "proxy" in auth_data):
            errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
+           log.debug(errormsg)
            raise Exception(errormsg)
         self.endpoint, self.auth_data = endpoint, auth_data
 

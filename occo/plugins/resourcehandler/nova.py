@@ -58,11 +58,6 @@ def setup_connection(endpoint, auth_data, resolved_node_definition):
     tenant_name = resolved_node_definition['resource'].get('tenant_name', None)
     project_id = resolved_node_definition['resource'].get('project_id', None)
     user_domain_name = resolved_node_definition['resource'].get('user_domain_name', 'Default')
-    if (not auth_data) or \
-       (((not "username" in auth_data) or (not "password" in auth_data)) and \
-       ((not "type" in auth_data) or (not "proxy" in auth_data))):
-       errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
-       raise NodeCreationError(None,errormsg)
     if auth_data.get('type',None) is None:
         user = auth_data['username']
         password = auth_data['password']
@@ -95,6 +90,27 @@ def needs_connection(f):
 
     return g
 
+import signal
+class GracefulInterruptHandler(object):
+    def __init__(self, sig=signal.SIGINT):
+        self.sig = sig
+    def __enter__(self):
+        self.interrupted = False
+        self.released = False
+        self.original_handler = signal.getsignal(self.sig)
+        def handler(signum, frame):
+            self.interrupted = True
+        signal.signal(self.sig, handler)
+        return self
+    def __exit__(self, type, value, tb):
+        self.release()
+    def release(self):
+        if self.released:
+            return False
+        signal.signal(self.sig, self.original_handler)
+        self.released = True
+        return True
+
 class CreateNode(Command):
     def __init__(self, resolved_node_definition):
         Command.__init__(self)
@@ -122,11 +138,28 @@ class CreateNode(Command):
         log.debug("[%s] Creating new server using image ID %r and flavor name %r",
             resource_handler.name, image_id, flavor_name)
         try:
-            server = self.conn.servers.create(server_name, image_id, flavor_name,
+            server = None
+            KBinterrupt = False
+            with GracefulInterruptHandler() as h:
+                log.debug('Server creation started for node %s...', node_def['node_id'])
+                server = self.conn.servers.create(server_name, image_id, flavor_name,
                      security_groups=sec_groups, key_name=key_name, userdata=context, nics=nics)
+                KBinterrupt = h.interrupted
+                log.debug('Server creation finished for node %s: server: %r', node_def['node_id'], server)
+            if KBinterrupt:
+              log.debug('Keyboard interrupt detected while VM was being created!')
+              raise KeyboardInterrupt
+        except KeyboardInterrupt:
+            log.debug('Interrupting node creation!')
+            if server is not None:
+                log.debug('Rolling back...')
+                try:
+                    self.conn.servers.delete(server)
+                except Exception as ex:
+                    raise NodeCreationError(None, str(ex))
+            raise
         except Exception as ex:
-            raise NodeCreationError(None, str(ex))
-        log.debug('Reservation: %r, server ID: %r', server, server.id)
+            raise NodeCreationError(None, str(ex)) 
         return server
 
     def _allocate_floating_ip(self, resource_handler,server):
@@ -185,14 +218,16 @@ class CreateNode(Command):
     def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
                   resource_handler.name, self.resolved_node_definition['name'])
-        try: 
+        try:
+            server = None 
             server = self._start_instance(resource_handler, self.resolved_node_definition)
             log.debug("[%s] Server instance created, id: %r", resource_handler.name, server.id)
             self._allocate_floating_ip(resource_handler,server)
         except KeyboardInterrupt:
-            log.info('Interrupting node creation! Rolling back. Please, stand by!')
             try:
-                self.conn.servers.delete(server)
+                if server is not None:
+                    log.debug('Interrupting node creation! Rolling back. Please, stand by!')
+                    self.conn.servers.delete(server)
             except Exception as ex:
                 raise NodeCreationError(None, str(ex))
             raise
@@ -317,6 +352,10 @@ class NovaResourceHandler(ResourceHandler):
         self.dry_run = dry_run
         self.name = name if name else endpoint
         self.endpoint = endpoint
+        if (not auth_data) or (((not "username" in auth_data) or (not "password" in auth_data)) and \
+            ((not "type" in auth_data) or (not "proxy" in auth_data))):
+            errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
+            raise NodeCreationError(None,errormsg)
         self.auth_data = auth_data
         self.data = config
 

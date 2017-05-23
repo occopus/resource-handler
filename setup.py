@@ -18,7 +18,7 @@ from pip.req import parse_requirements
 
 setuptools.setup(
     name='OCCO-ResourceHandler',
-    version='1.4',
+    version='1.5',
     author='MTA SZTAKI',
     author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
@@ -46,6 +46,7 @@ setuptools.setup(
         'argparse',
         'backports.ssl-match-hostname',
         'boto',
+        'dicttoxml',
         'docker-py',
         'ndg-httpsclient',
         'python-dateutil',
