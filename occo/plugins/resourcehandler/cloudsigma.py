@@ -194,11 +194,20 @@ class CreateNode(Command):
                 log.error(errormsg)
                 self._delete_drive(resource_handler, drv_id)
                 raise NodeCreationError(None, errormsg)
-            ret, errormsg = self._start_server(resource_handler, srv_id)
+            ret = False
             while not ret:
-                log.debug(errormsg)
-                time.sleep(5)
                 ret, errormsg = self._start_server(resource_handler, srv_id)
+                if not ret:
+                    log.debug(errormsg)
+                    #Query state to check if previous api call had positive effect
+                    json_data = get_server_json(resource_handler, srv_id)
+                    if json_data is not None and json_data.get('status') in ['starting','started','running']:
+                        log.debug("Despite of failed server start, status of server is %s."+
+                                  "Considering action success.",json_data.get('status'))
+                        ret = True
+                    else:
+                        log.debug("Result of state query: %s",json_data.get('status'))
+                    time.sleep(5)
         except KeyboardInterrupt:
             log.info('Interrupting node creation! Rolling back. Please, stand by!')
             if srv_id:
