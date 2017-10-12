@@ -47,7 +47,7 @@ setuptools.setup(
         'backports.ssl-match-hostname',
         'boto',
         'dicttoxml',
-        'docker-py',
+        'docker',
         'ndg-httpsclient',
         'python-dateutil',
         'PyYAML',
