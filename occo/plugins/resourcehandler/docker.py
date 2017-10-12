@@ -200,7 +200,7 @@ class DockerResourceHandler(ResourceHandler):
                  **config):
         self.dry_run = dry_run
         self.name = name if name else endpoint
-        self.cli = docker.Client(endpoint)
+        self.cli = docker.APIClient(base_url=endpoint)
 
     def cri_create_node(self, resolved_node_definition):
         return CreateNode(resolved_node_definition)
