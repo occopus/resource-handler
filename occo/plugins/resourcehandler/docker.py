@@ -75,6 +75,8 @@ class CreateNode(Command):
                  resource_handler.name, self.origin, self.image, self.tag)
         if self.origin == 'dockerhub':
             resource_handler.cli.pull(repository=self.image, tag=self.tag)
+        elif self.origin == 'local':
+            pass
         else:
             resource_handler.cli.import_image_from_url(
                 url=self.origin,
@@ -195,7 +197,7 @@ class DockerResourceHandler(ResourceHandler):
 
     .. _Docker: https://www.docker.com/
     """
-    def __init__(self, endpoint, 
+    def __init__(self, endpoint,
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
@@ -237,4 +239,3 @@ class DockerSchemaChecker(RHSchemaChecker):
             msg = "Unknown key(s): " + ', '.join(str(key) for key in invalid_keys)
             raise SchemaError(msg)
         return True
-
