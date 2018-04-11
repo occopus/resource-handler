@@ -1,5 +1,5 @@
 argparse==1.2.1
-boto==2.34.0
+boto==2.48.0
 python-dateutil==2.2
 PyYAML==3.11
 dicttoxml==1.7.4

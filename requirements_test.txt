@@ -3,7 +3,7 @@
 
 argparse>=1.2.1
 backports.ssl-match-hostname==3.5.0.1
-boto==2.34.0
+boto==2.48.0
 cov-core==1.15.0
 coverage==3.7.1
 dateutils==0.6.6
