@@ -53,8 +53,8 @@ def setup_connection(endpoint, regionname, auth_data):
     url = urlparse.urlparse(endpoint)
     region = boto.ec2.regioninfo.RegionInfo(
         name=regionname, endpoint=url.hostname)
-    log.debug('Connecting to %r %r as %r',
-              endpoint, region, auth_data['accesskey'])
+    log.debug('Connecting to url %r %r as %r',
+              url, region, auth_data['accesskey'])
     return boto.connect_ec2(
         aws_access_key_id=auth_data['accesskey'],
         aws_secret_access_key=auth_data['secretkey'],
