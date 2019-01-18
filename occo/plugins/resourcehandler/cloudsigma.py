@@ -318,7 +318,11 @@ class GetIpAddress(Command):
         if 'nics' not in json_data['runtime']:
             return rv
         for nic in json_data['runtime']['nics']:
-            return nic['ip_v4']['uuid']
+            if nic == None:
+              continue
+            if nic.get('ip_v4') is not None:
+              return nic.get('ip_v4').get('uuid',rv)
+        return rv
 
 class GetAddress(Command):
     def __init__(self, instance_data):
@@ -335,9 +339,13 @@ class GetAddress(Command):
         if json_data['runtime'] == None:
             return rv
         if 'nics' not in json_data['runtime']:
-            return None
+            return rv
         for nic in json_data['runtime']['nics']:
-            return nic['ip_v4']['uuid']
+            if nic == None:
+              continue
+            if nic.get('ip_v4') is not None:
+              return nic.get('ip_v4').get('uuid',rv)
+        return rv
 
 @factory.register(ResourceHandler, PROTOCOL_ID)
 class CloudSigmaResourceHandler(ResourceHandler):
