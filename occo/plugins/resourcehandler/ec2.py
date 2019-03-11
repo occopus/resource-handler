@@ -31,6 +31,7 @@ import itertools as it
 import logging
 import occo.constants.status as status
 from occo.exceptions import SchemaError,NodeCreationError
+import time
 
 __all__ = ['EC2ResourceHandler']
 
@@ -111,6 +112,24 @@ class CreateNode(Command):
                                               subnet_id=subnet_id,
                                               security_group_ids=sec_group_ids)
         vm_id = reservation.instances[0].id
+      
+        tags = rnd['resource'].get('tags', None)
+        if tags:
+          instance = reservation.instances[0]
+          status = instance.update()
+          log.debug("[%s] Adding tags: waiting for node (%r) to be ready...",
+                  resource_handler.name, self.resolved_node_definition['name'])
+          while status == 'pending':
+            time.sleep(1)
+            status = instance.update()
+          if status == 'running':
+            for key in tags:
+              log.debug("[%s] Adding tag: %s => %s",
+                  resource_handler.name, key, tags[key])
+              instance.add_tag(key, tags[key])
+          log.debug("[%s] Finished adding tags to node (%r).",
+                    resource_handler.name, self.resolved_node_definition['name'])
+
         return vm_id
 
     def perform(self, resource_handler):
@@ -271,7 +290,7 @@ class EC2ResourceHandler(ResourceHandler):
 class EC2SchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "regionname", "image_id", "instance_type"]
-        self.opt_keys = ["key_name", "security_group_ids", "subnet_id", "name"]
+        self.opt_keys = ["key_name", "security_group_ids", "subnet_id", "name", "tags"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
