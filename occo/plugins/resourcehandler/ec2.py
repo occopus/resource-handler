@@ -191,7 +191,7 @@ class GetIpAddress(Command):
         inst = get_instance(self.conn, self.instance_data['instance_id'])
         ip_address = None if inst.ip_address is '' else inst.ip_address
         private_ip_address = None if inst.private_ip_address is '' else inst.private_ip_address
-        return coalesce(ip_address, private_ip_address)
+        return private_ip_address
 
 class GetAddress(Command):
     def __init__(self, instance_data):
