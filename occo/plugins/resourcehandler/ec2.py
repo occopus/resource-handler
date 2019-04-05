@@ -31,6 +31,7 @@ import itertools as it
 import logging
 import occo.constants.status as status
 from occo.exceptions import SchemaError,NodeCreationError
+import time
 
 __all__ = ['EC2ResourceHandler']
 
@@ -53,8 +54,8 @@ def setup_connection(endpoint, regionname, auth_data):
     url = urlparse.urlparse(endpoint)
     region = boto.ec2.regioninfo.RegionInfo(
         name=regionname, endpoint=url.hostname)
-    log.debug('Connecting to %r %r as %r',
-              endpoint, region, auth_data['accesskey'])
+    log.debug('Connecting to url %r %r as %r',
+              url, region, auth_data['accesskey'])
     return boto.connect_ec2(
         aws_access_key_id=auth_data['accesskey'],
         aws_secret_access_key=auth_data['secretkey'],
@@ -111,6 +112,24 @@ class CreateNode(Command):
                                               subnet_id=subnet_id,
                                               security_group_ids=sec_group_ids)
         vm_id = reservation.instances[0].id
+      
+        tags = rnd['resource'].get('tags', None)
+        if tags:
+          instance = reservation.instances[0]
+          status = instance.update()
+          log.debug("[%s] Adding tags: waiting for node (%r) to be ready...",
+                  resource_handler.name, self.resolved_node_definition['name'])
+          while status == 'pending':
+            time.sleep(1)
+            status = instance.update()
+          if status == 'running':
+            for key in tags:
+              log.debug("[%s] Adding tag: %s => %s",
+                  resource_handler.name, key, tags[key])
+              instance.add_tag(key, tags[key])
+          log.debug("[%s] Finished adding tags to node (%r).",
+                    resource_handler.name, self.resolved_node_definition['name'])
+
         return vm_id
 
     def perform(self, resource_handler):
@@ -191,7 +210,7 @@ class GetIpAddress(Command):
         inst = get_instance(self.conn, self.instance_data['instance_id'])
         ip_address = None if inst.ip_address is '' else inst.ip_address
         private_ip_address = None if inst.private_ip_address is '' else inst.private_ip_address
-        return coalesce(ip_address, private_ip_address)
+        return private_ip_address
 
 class GetAddress(Command):
     def __init__(self, instance_data):
@@ -271,7 +290,7 @@ class EC2ResourceHandler(ResourceHandler):
 class EC2SchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "regionname", "image_id", "instance_type"]
-        self.opt_keys = ["key_name", "security_group_ids", "subnet_id", "name"]
+        self.opt_keys = ["key_name", "security_group_ids", "subnet_id", "name", "tags"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:

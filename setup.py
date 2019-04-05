@@ -14,11 +14,10 @@
 #!/usr/bin/env python
 
 import setuptools
-from pip.req import parse_requirements
 
 setuptools.setup(
     name='OCCO-ResourceHandler',
-    version='1.5',
+    version='1.6',
     author='MTA SZTAKI',
     author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
@@ -47,7 +46,7 @@ setuptools.setup(
         'backports.ssl-match-hostname',
         'boto',
         'dicttoxml',
-        'docker-py',
+        'docker',
         'ndg-httpsclient',
         'python-dateutil',
         'PyYAML',

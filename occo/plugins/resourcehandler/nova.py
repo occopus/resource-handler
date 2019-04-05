@@ -298,7 +298,7 @@ class GetState(Command):
                       resource_handler.name, inst_state, retval)
             return retval
 
-class GetIpAddress(Command):
+class GetAnyIpAddress(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
         self.instance_data = instance_data
@@ -323,6 +323,40 @@ class GetIpAddress(Command):
             for addre in networks[tenant]:
                 return addre['addr'].encode('latin-1')
         return None
+
+class GetPrivIpAddress(Command):
+    def __init__(self, instance_data):
+        Command.__init__(self)
+        self.instance_data = instance_data
+        self.resolved_node_definition = instance_data['resolved_node_definition']
+
+    @wet_method('127.0.0.1')
+    @needs_connection
+    def perform(self, resource_handler):
+        log.debug("[%s] Acquiring private IP address for %r",
+                  resource_handler.name,
+                  self.instance_data['node_id'])
+        try:
+            server = self.conn.servers.get(self.instance_data['instance_id'])
+        except Exception as ex:
+            raise NodeCreationError(None, str(ex))
+        ip = ""
+        floating_ips = self.conn.floating_ips.list()
+        networks = self.conn.servers.ips(server)
+        for tenant in networks.keys():
+            log.debug("[%s] networks[tenant]: %s",resource_handler.name,networks[tenant])
+            for addre in networks[tenant]:
+                ip = addre['addr'].encode('latin-1')
+                private_ip = ip
+                for floating_ip in floating_ips:
+                    if floating_ip.instance_id == server.id:
+                        if floating_ip.ip == ip:
+                            private_ip = ""
+                if private_ip != "":
+                  log.debug("[%s] Private ip found: %s",resource_handler.name,private_ip)
+                  return private_ip
+        log.debug("[%s] Private ip not found.",resource_handler.name,ip)
+        return None 
 
 @factory.register(ResourceHandler, PROTOCOL_ID)
 class NovaResourceHandler(ResourceHandler):
@@ -372,10 +406,10 @@ class NovaResourceHandler(ResourceHandler):
         return GetState(instance_data)
 
     def cri_get_address(self, instance_data):
-        return GetIpAddress(instance_data)
+        return GetAnyIpAddress(instance_data)
 
     def cri_get_ip_address(self, instance_data):
-        return GetIpAddress(instance_data)
+        return GetPrivIpAddress(instance_data)
 
     def perform(self, instruction):
         instruction.perform(self)

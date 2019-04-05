@@ -28,6 +28,7 @@ import logging
 import occo.constants.status as status
 import requests, json, uuid, time, base64
 from occo.exceptions import SchemaError, NodeCreationError
+import httplib
 
 __all__ = ['CloudSigmaResourceHandler']
 
@@ -51,8 +52,8 @@ def get_server_json(resource_handler, srv_id):
     r = requests.get(resource_handler.endpoint + '/servers/' + srv_id + '/',
         auth=get_auth(resource_handler.auth_data))
     if r.status_code != 200:
-        log.error('[%s] Failed to get server\'s info, response code: %d', resource_handler.name, r.status_code)
-        log.error('[%s] Response text: %s', resource_handler.name, r.text)
+        log.error('[%s] Failed to get info from server %s! HTTP response code/message: %d/%s. Server response: %s.', 
+                  resource_handler.name, srv_id, r.status_code, httplib.responses[r.status_code], r.text)
         return None
     return r.json()
 
@@ -66,8 +67,8 @@ class CreateNode(Command):
         r = requests.post(resource_handler.endpoint + '/libdrives/' + libdrive_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'clone'})
         if r.status_code != 202:
-            error_msg = '[{0}] Cloning library drive {1} failed! Response code: {2}. Response message: {3}.'.format(
-                        resource_handler.name, libdrive_id, r.status_code, r.text)
+            error_msg = '[{0}] Cloning library drive {1} failed! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
+                        resource_handler.name, libdrive_id, r.status_code, httplib.responses[r.status_code], r.text)
             return None, error_msg
         json_data = json.loads(r.text)
         uuid = json_data['objects'][0]['uuid']
@@ -82,8 +83,8 @@ class CreateNode(Command):
         r = requests.delete(resource_handler.endpoint + '/drives/' + str(drv_id) + '/',
             auth=get_auth(resource_handler.auth_data))
         if r.status_code != 204:
-            error_msg = '[{0}] Deleting cloned drive {1} failed! Response code: {2}. Response message: {3}'.format(
-                        resource_handler.name, drv_id, r.status_code, r.text)
+            error_msg = '[{0}] Deleting cloned drive {1} failed! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
+                        resource_handler.name, drv_id, r.status_code, httplib.responses[r.status_code], r.text)
             return error_msg
         return None
         
@@ -93,8 +94,8 @@ class CreateNode(Command):
         r = requests.get(resource_handler.endpoint + '/drives/' + str(drv_id) + '/',
             auth=get_auth(resource_handler.auth_data))
         if r.status_code != 200:
-            error_msg = '[{0}] Failed to query drive status! Response code: {1}. Response message: {2}.'.format(
-                        resource_handler.name, r.status_code, r.text)
+            error_msg = '[{0}] Failed to query status of drive {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
+                        resource_handler.name, drv_id, r.status_code, httplib.responses[r.status_code], r.text)
             return 'unknown', error_msg
         st = r.json()['status']
         log.debug('[%s] Status of drive %s is: %s', resource_handler.name, drv_id, st)
@@ -133,8 +134,8 @@ class CreateNode(Command):
         r = requests.post(resource_handler.endpoint + '/servers/',
             auth=get_auth(resource_handler.auth_data), json=json_data)
         if r.status_code != 201:
-            error_msg = '[{0}] Failed to create server! Response code: {1}. Response message: {2}.'.format(
-                        resource_handler.name, r.status_code, r.text)
+            error_msg = '[{0}] Failed to create server! HTTP response code/message: {1}/{2}. Server response: {3}.'.format(
+                        resource_handler.name, r.status_code, httplib.responses[r.status_code], r.text)
             return None, error_msg
         srv_uuid = r.json()['objects'][0]['uuid']
         log.debug('[%s] Created server\'s UUID is: %s', resource_handler.name, srv_uuid)
@@ -146,8 +147,8 @@ class CreateNode(Command):
             auth=get_auth(resource_handler.auth_data), params={'recurse': 'all_drives'},
             headers={'Content-type': 'application/json'})
         if r.status_code != 204:
-            error_msg = '[{0}] Failed to delete server! Response code: {1}. Response text: {2}.'.format(
-                        resource_handler.name, r.status_code, r.text)
+            error_msg = '[{0}] Failed to delete server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
+                        resource_handler.name, srv_id, r.status_code, httplib.responses[r.status_code], r.text)
             return error_msg
         return None
 
@@ -156,8 +157,8 @@ class CreateNode(Command):
         r = requests.post(resource_handler.endpoint + '/servers/' + srv_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'start'})
         if r.status_code != 202:
-            error_msg = '[{0}] Failed to start server! Response code: {1}. Response message: {2}.'.format(
-                        resource_handler.name, r.status_code, r.text)
+            error_msg = '[{0}] Failed to start server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
+                        resource_handler.name, srv_id, r.status_code, httplib.responses[r.status_code], r.text)
             return False, error_msg
         return True, ""
 
@@ -166,8 +167,8 @@ class CreateNode(Command):
         r = requests.post(resource_handler.endpoint + '/servers/' + srv_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'stop'})
         if r.status_code != 202:
-             error_msg = '[{0}] Failed to stop server! Response code: {1}. Response text: {2}.'.format(
-                         resource_handler.name, r.status_code, r.text)
+             error_msg = '[{0}] Failed to stop server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
+                         resource_handler.name, srv_id, r.status_code, httplib.responses[r.status_code], r.text)
              return False, error_msg
         return True, ""
 
@@ -194,11 +195,20 @@ class CreateNode(Command):
                 log.error(errormsg)
                 self._delete_drive(resource_handler, drv_id)
                 raise NodeCreationError(None, errormsg)
-            ret, errormsg = self._start_server(resource_handler, srv_id)
+            ret = False
             while not ret:
-                log.debug(errormsg)
-                time.sleep(5)
                 ret, errormsg = self._start_server(resource_handler, srv_id)
+                if not ret:
+                    log.debug(errormsg)
+                    #Query state to check if previous api call had positive effect
+                    json_data = get_server_json(resource_handler, srv_id)
+                    if json_data is not None and json_data.get('status') in ['starting','started','running']:
+                        log.debug("Despite of failed server start, status of server is %s."+
+                                  "Considering action success.",json_data.get('status'))
+                        ret = True
+                    else:
+                        log.debug("Result of state query: %s",json_data.get('status'))
+                    time.sleep(5)
         except KeyboardInterrupt:
             log.info('Interrupting node creation! Rolling back. Please, stand by!')
             if srv_id:
@@ -229,8 +239,8 @@ class DropNode(Command):
         r = requests.post(resource_handler.endpoint + '/servers/' + srv_id + '/action/',
             auth=get_auth(resource_handler.auth_data), params={'do': 'stop'})
         if r.status_code != 202:
-             error_msg = '[{0}] Failed to stop server! Response code: {1}. Response text: {2}.'.format(
-                         resource_handler.name, r.status_code, r.text)
+             error_msg = '[{0}] Failed to stop server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
+                         resource_handler.name, srv_id, r.status_code, httplib.responses[r.status_code], r.text)
              return False, error_msg
         return True, ""
 
@@ -240,8 +250,8 @@ class DropNode(Command):
             auth=get_auth(resource_handler.auth_data), params={'recurse': 'all_drives'},
             headers={'Content-type': 'application/json'})
         if r.status_code != 204:
-            error_msg = '[{0}] Failed to delete server! Response code: {1}. Response text: {2}.'.format(
-                        resource_handler.name, r.status_code, r.text)
+            error_msg = '[{0}] Failed to delete server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
+                        resource_handler.name, srv_id, r.status_code, httplib.responses[r.status_code], r.text)
             return error_msg
         return None
 
@@ -308,7 +318,11 @@ class GetIpAddress(Command):
         if 'nics' not in json_data['runtime']:
             return rv
         for nic in json_data['runtime']['nics']:
-            return nic['ip_v4']['uuid']
+            if nic == None:
+              continue
+            if nic.get('ip_v4') is not None:
+              return nic.get('ip_v4').get('uuid',rv)
+        return rv
 
 class GetAddress(Command):
     def __init__(self, instance_data):
@@ -325,9 +339,13 @@ class GetAddress(Command):
         if json_data['runtime'] == None:
             return rv
         if 'nics' not in json_data['runtime']:
-            return None
+            return rv
         for nic in json_data['runtime']['nics']:
-            return nic['ip_v4']['uuid']
+            if nic == None:
+              continue
+            if nic.get('ip_v4') is not None:
+              return nic.get('ip_v4').get('uuid',rv)
+        return rv
 
 @factory.register(ResourceHandler, PROTOCOL_ID)
 class CloudSigmaResourceHandler(ResourceHandler):
