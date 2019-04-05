@@ -1,3 +1,11 @@
+v1.6 - Apr 2019
+- Remove req import from setup.py
+- Fixes in cloudsigma plugin (start server timeout, error code, ip retrieval)
+- Fixes in docker plugin (version, dependencies, local image source support)
+- Fixes in ec2 plugin (boto v2.48.0. with dependencies)
+- implement methods to serve getprivip() macro for nova, ec2
+- add tagging possibility for ec2 clouds
+
 v1.5 - May 2017
 - Improve error handling and logging in cloudsigma, ec2 and occi plugins
 - Reimplemented cloudbroker plugin: handle instances, not jobs
