@@ -279,7 +279,7 @@ class CreateNode(Command):
             log.info('Interrupting node creation! Rolling back. Please, stand by!')
             if srv_id:
                 srv_st = get_server_status(resource_handler, srv_id)
-                while srv_st != 'stopped':
+                while srv_st not in ['stopped','unknown']:
                     log.debug("[%s] Server is in %s state.",resource_handler.name, srv_st)
                     time.sleep(wait_time_between_api_call_retries)
                     if srv_st != 'stopping':
@@ -352,7 +352,7 @@ class DropNode(Command):
                 self.instance_data['node_id'])
 
         srv_st = get_server_status(resource_handler, srv_id)
-        while srv_st != 'stopped':
+        while srv_st not in ['stopped','unknown']:
             log.debug("[%s] Server is in %s state. Waiting for \"stopped\" state...",resource_handler.name, srv_st)
             if srv_st != 'stopping':
               self._stop_server(resource_handler, srv_id)
