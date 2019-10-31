@@ -158,7 +158,7 @@ class DropNode(Command):
         :Remark: This is a "wet method", termination will not be attempted
             if the instance is in debug mode (``dry_run``).
         """
-        self.stop_instances(instance_ids=vm_ids, force=True)
+        self.conn.stop_instances(instance_ids=vm_ids, force=True)
         self.conn.terminate_instances(instance_ids=vm_ids)
 
     def perform(self, resource_handler):
