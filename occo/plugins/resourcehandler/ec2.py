@@ -211,6 +211,10 @@ class GetIpAddress(Command):
         inst = get_instance(self.conn, self.instance_data['instance_id'])
         ip_address = None if inst.ip_address is '' else inst.ip_address
         private_ip_address = None if inst.private_ip_address is '' else inst.private_ip_address
+        log.debug("[%s] Priv IP address for %r is \"%s\"",
+                  resource_handler.name,
+                  self.instance_data['node_id'],
+                  private_ip_address)
         return private_ip_address
 
 class GetAddress(Command):
@@ -228,9 +232,17 @@ class GetAddress(Command):
         public_dns_name = None if inst.public_dns_name is '' else inst.public_dns_name
         ip_address = None if inst.ip_address is '' else inst.ip_address
         private_ip_address = None if inst.private_ip_address is '' else inst.private_ip_address
-        return coalesce(public_dns_name,
-                        ip_address,
-                        private_ip_address)
+        log.debug("[%s] Addresses for %r are \"%s\", \"%s\", \"%s\"",
+                  resource_handler.name,
+                  self.instance_data['node_id'],
+                  public_dns_name if public_dns_name else "None",
+                  ip_address if ip_address else "None",
+                  private_ip_address)
+        addresses = list()
+        addresses = addresses[:]+[public_dns_name] if public_dns_name else addresses
+        addresses = addresses[:]+[ip_address] if ip_address else addresses
+        addresses = addresses[:]+[private_ip_address] if private_ip_address else addresses
+        return addresses
 
 @factory.register(ResourceHandler, PROTOCOL_ID)
 class EC2ResourceHandler(ResourceHandler):
