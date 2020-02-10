@@ -67,6 +67,15 @@ def setup_connection(endpoint, auth_data, resolved_node_definition):
             auth = v3.Password(auth_url=endpoint, username=user, password=password, project_id=project_id, user_domain_name=user_domain_name)
             sess = session.Session(auth=auth)
             nt = novaclient.client.Client(2, session=sess)
+    elif auth_data.get('type',None) == 'v3applicationcredential':
+        cred_id = auth_data['id']
+        cred_secret = auth_data['secret']
+        if tenant_name is None:
+            auth = v3.ApplicationCredential(auth_url = endpoint,
+                                            application_credential_secret = cred_secret,
+                                            application_credential_id = cred_id)
+            sess = session.Session(auth=auth)
+            nt = novaclient.client.Client(2, session=sess)      
     elif auth_data.get('type',None) == 'voms':
         novaclient.auth_plugin.discover_auth_systems()
         auth_plugin = novaclient.auth_plugin.load_plugin('voms')
@@ -385,9 +394,16 @@ class NovaResourceHandler(ResourceHandler):
         self.dry_run = dry_run
         self.name = name if name else endpoint
         self.endpoint = endpoint
-        if (not auth_data) or (((not "username" in auth_data) or (not "password" in auth_data)) and \
-            ((not "type" in auth_data) or (not "proxy" in auth_data))):
-            errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
+        if (not auth_data) or \
+           ((not "type" in auth_data) and \
+             ((not "username" in auth_data) or (not "password" in auth_data))) or \
+           (("type" in auth_data) and \
+             ((not "v3applicationcredential" in auth_data['type']) and \
+              (not "voms" in auth_data['type']))) or \
+           (("type" in auth_data) and ("v3applicationcredential" in auth_data['type']) and \
+             ((not "id" in auth_data) or (not "secret" in auth_data))) or \
+           (("type" in auth_data) and ("voms" in auth_data['type']) and (not "proxy" in auth_data)):
+            errormsg = "Cannot find credentials for \""+endpoint+"\". Found only: \""+str(auth_data)+"\". Please, specify!"
             raise NodeCreationError(None,errormsg)
         self.auth_data = auth_data
         self.data = config
