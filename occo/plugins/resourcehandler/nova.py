@@ -58,15 +58,16 @@ def setup_connection(endpoint, auth_data, resolved_node_definition):
     tenant_name = resolved_node_definition['resource'].get('tenant_name', None)
     project_id = resolved_node_definition['resource'].get('project_id', None)
     user_domain_name = resolved_node_definition['resource'].get('user_domain_name', 'Default')
+    region_name = resolved_node_definition['resource'].get('region_name', None)
     if auth_data.get('type', None) is None:
         user = auth_data['username']
         password = auth_data['password']
         if tenant_name is not None:
-            nt = novaclient.client.Client('2.0', user, password, tenant_name, endpoint)
+            nt = novaclient.client.Client('2.0', user, password, tenant_name, endpoint, region_name=region_name)
         else:
             auth = v3.Password(auth_url=endpoint, username=user, password=password, project_id=project_id, user_domain_name=user_domain_name)
             sess = session.Session(auth=auth)
-            nt = novaclient.client.Client(2, session=sess)
+            nt = novaclient.client.Client(2, session=sess, region_name=region_name)
     elif auth_data.get('type',None) == 'v3applicationcredential':
         cred_id = auth_data['id']
         cred_secret = auth_data['secret']
@@ -75,12 +76,12 @@ def setup_connection(endpoint, auth_data, resolved_node_definition):
                                             application_credential_secret = cred_secret,
                                             application_credential_id = cred_id)
             sess = session.Session(auth=auth)
-            nt = novaclient.client.Client(2, session=sess)      
+            nt = novaclient.client.Client(2, session=sess, region_name=region_name)
     elif auth_data.get('type',None) == 'voms':
         novaclient.auth_plugin.discover_auth_systems()
         auth_plugin = novaclient.auth_plugin.load_plugin('voms')
         auth_plugin.opts["x509_user_proxy"] = auth_data['proxy']
-        nt = novaclient.client.Client('2.0', None, None, tenant_name, endpoint, auth_plugin=auth_plugin, auth_system='voms')
+        nt = novaclient.client.Client('2.0', None, None, tenant_name, endpoint, auth_plugin=auth_plugin, auth_system='voms',region_name=region_name)
     return nt
 
 def needs_connection(f):
@@ -433,7 +434,7 @@ class NovaResourceHandler(ResourceHandler):
 class NovaSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "image_id", "flavor_name"]
-        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip", "name", "project_id", "tenant_name", "user_domain_name", "network_id", "floating_ip_pool"]
+        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip", "name", "project_id", "tenant_name", "user_domain_name", "network_id", "floating_ip_pool", "region_name"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
