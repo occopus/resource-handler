@@ -26,7 +26,7 @@ import novaclient.client
 import novaclient.auth_plugin
 from keystoneauth1.identity import v3
 from keystoneauth1 import session
-import urlparse
+from urllib.parse import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce, unique_vmname
 from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
@@ -158,14 +158,14 @@ class CreateNode(Command):
                     raise NodeCreationError(None, str(ex))
             raise
         except Exception as ex:
-            raise NodeCreationError(None, str(ex)) 
+            raise NodeCreationError(None, str(ex))
         return server
 
     def _allocate_floating_ip(self, resource_handler,server):
         pool = self.resolved_node_definition['resource'].get('floating_ip_pool', None)
         if ('floating_ip' not in self.resolved_node_definition['resource']) and (pool is None):
             return
-        flip_waiting = 5 
+        flip_waiting = 10
         flip_attempts = 60
         attempts = 1
         while attempts <= flip_attempts:
@@ -184,7 +184,7 @@ class CreateNode(Command):
             log.debug("[%s] List of unused floating ips: %s", resource_handler.name, str([ ip.ip for ip in unused_ips]))
             floating_ip = random.choice(unused_ips)
             try:
-                log.debug("[%s] Try associating floating ip (%s) to server (%s)...", 
+                log.debug("[%s] Try associating floating ip (%s) to server (%s)...",
                           resource_handler.name, floating_ip.ip, server.id)
                 server.add_floating_ip(floating_ip)
                 time.sleep(random.randint(1,5))
@@ -218,7 +218,7 @@ class CreateNode(Command):
         log.debug("[%s] Creating node: %r",
                   resource_handler.name, self.resolved_node_definition['name'])
         try:
-            server = None 
+            server = None
             server = self._start_instance(resource_handler, self.resolved_node_definition)
             log.debug("[%s] Server instance created, id: %r", resource_handler.name, server.id)
             self._allocate_floating_ip(resource_handler,server)
@@ -283,7 +283,7 @@ class GetState(Command):
     def perform(self, resource_handler):
         log.debug("[%s] Acquiring node state %r",
                   resource_handler.name, self.instance_data['node_id'])
-        try: 
+        try:
             server = self.conn.servers.get(self.instance_data['instance_id'])
         except Exception as ex:
             raise NodeCreationError(None, str(ex))
@@ -318,7 +318,7 @@ class GetAnyIpAddress(Command):
             if floating_ip.instance_id == server.id:
                 return floating_ip.ip
         networks = self.conn.servers.ips(server)
-        for tenant in networks.keys():
+        for tenant in list(networks.keys()):
             for addre in networks[tenant]:
                 return addre['addr'].encode('latin-1')
         return None
@@ -342,7 +342,7 @@ class GetPrivIpAddress(Command):
         ip = ""
         floating_ips = self.conn.floating_ips.list()
         networks = self.conn.servers.ips(server)
-        for tenant in networks.keys():
+        for tenant in list(networks.keys()):
             log.debug("[%s] networks[tenant]: %s",resource_handler.name,networks[tenant])
             for addre in networks[tenant]:
                 ip = addre['addr'].encode('latin-1')
@@ -412,7 +412,7 @@ class NovaResourceHandler(ResourceHandler):
 
     def perform(self, instruction):
         instruction.perform(self)
-    
+
 @factory.register(RHSchemaChecker, PROTOCOL_ID)
 class NovaSchemaChecker(RHSchemaChecker):
     def __init__(self):
@@ -429,4 +429,3 @@ class NovaSchemaChecker(RHSchemaChecker):
             msg = "Unknown key(s): " + ', '.join(str(key) for key in invalid_keys)
             raise SchemaError(msg)
         return True
-

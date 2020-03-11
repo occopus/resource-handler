@@ -17,7 +17,7 @@
 
 .. moduleauthor:: Adam Visegradi <adam.visegradi@sztaki.mta.hu>, Sandor Acs <acs.sandor@sztaki.mta.hu>
 """
-from __future__ import absolute_import
+
 import occo.util.factory as factory
 import docker
 import ast
@@ -167,7 +167,7 @@ class GetIpAddress(Command):
         instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
         info = resource_handler.cli.inspect_container(container=instance_id)
         ip_addresses = []
-        for k, v in info['NetworkSettings']['Networks'].iteritems():
+        for k, v in info['NetworkSettings']['Networks'].items():
             ip_addresses.append(v['IPAddress'])
         return ip_addresses[0]
 
@@ -184,7 +184,7 @@ class GetAddress(Command):
         instance_id = ast.literal_eval(self.instance_data['instance_id'])['Id']
         info = resource_handler.cli.inspect_container(container=instance_id)
         ip_addresses = []
-        for k, v in info['NetworkSettings']['Networks'].iteritems():
+        for k, v in info['NetworkSettings']['Networks'].items():
             ip_addresses.append(v['IPAddress'])
         return ip_addresses[0]
 

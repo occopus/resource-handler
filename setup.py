@@ -56,7 +56,6 @@ setuptools.setup(
         'websocket-client',
         'python-novaclient',
         'ruamel.yaml',
-        'ruamel.ordereddict',
         'voms-auth-system-openstack',
         'unicodecsv',
         'simplejson'

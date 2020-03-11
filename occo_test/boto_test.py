@@ -145,7 +145,7 @@ class BotoTest(unittest.TestCase):
         self.drop_nodes = remaining
         self.update_drop_nodes()
         if last_exception:
-            raise last_exception, None, sys.exc_info()[2]
+            raise last_exception.with_traceback(sys.exc_info()[2])
 
     @real_resource
     def test_node_status(self):
@@ -170,4 +170,4 @@ class BotoTest(unittest.TestCase):
                 log.exception('Failure:')
                 last_exception = ex
         if last_exception:
-            raise last_exception, None, sys.exc_info()[2]
+            raise last_exception.with_traceback(sys.exc_info()[2])

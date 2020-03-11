@@ -20,7 +20,7 @@
 
 import time
 import uuid
-import urlparse
+from urllib.parse import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce, basic_run_process
 from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker

@@ -18,8 +18,8 @@
 .. moduleauthor:: Zoltan Farkas <zoltan.farkas@sztaki.mta.hu>
 """
 
-from __future__ import absolute_import
-import urlparse
+
+from urllib.parse import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce, unique_vmname
 from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
@@ -28,7 +28,7 @@ import logging
 import occo.constants.status as status
 import requests, json, uuid, time, base64
 from occo.exceptions import SchemaError, NodeCreationError
-import httplib
+import http.client
 
 __all__ = ['CloudSigmaResourceHandler']
 
@@ -52,13 +52,13 @@ def get_auth(auth_data):
 
 def get_server_json(resource_handler, srv_id):
     if not srv_id:
-       return None 
+       return None
     r = requests.get(resource_handler.endpoint + '/servers/' + srv_id + '/',
         auth=get_auth(resource_handler.auth_data))
     if r.status_code != 200:
-        log.error('[%s] Failed to get info from server %s! HTTP response code/message: %d/%s. Server response: %s.', 
-                  resource_handler.name, srv_id, r.status_code, 
-                  httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+        log.error('[%s] Failed to get info from server %s! HTTP response code/message: %d/%s. Server response: %s.',
+                  resource_handler.name, srv_id, r.status_code,
+                  http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
         return None
     return r.json()
 
@@ -81,8 +81,8 @@ class CreateNode(Command):
             auth=get_auth(resource_handler.auth_data), params={'do': 'clone'})
         retry=max_number_of_api_call_retries
         while r.status_code != 202 and retry>0:
-          error_msg = '[{0}] Cloning library drive {1} failed! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(resource_handler.name, libdrive_id, r.status_code, 
-             httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+          error_msg = '[{0}] Cloning library drive {1} failed! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(resource_handler.name, libdrive_id, r.status_code,
+             http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
           log.debug(error_msg)
           log.debug('Retrying in {0} seconds...  {1} attempts left.'.format(wait_time_between_api_call_retries,retry))
           time.sleep(wait_time_between_api_call_retries)
@@ -91,8 +91,8 @@ class CreateNode(Command):
             auth=get_auth(resource_handler.auth_data), params={'do': 'clone'})
         if r.status_code != 202:
             error_msg = '[{0}] Cloning library drive {1} failed! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
-                        resource_handler.name, libdrive_id, r.status_code, 
-                        httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+                        resource_handler.name, libdrive_id, r.status_code,
+                        http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
             return None, error_msg
         json_data = json.loads(r.text)
         uuid = json_data['objects'][0]['uuid']
@@ -108,8 +108,8 @@ class CreateNode(Command):
             auth=get_auth(resource_handler.auth_data))
         retry=max_number_of_api_call_retries
         while r.status_code != 204 and retry>0:
-          error_msg = '[{0}] Deleting cloned drive {1} failed! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(resource_handler.name, drv_id, r.status_code, 
-             httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+          error_msg = '[{0}] Deleting cloned drive {1} failed! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(resource_handler.name, drv_id, r.status_code,
+             http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
           log.debug(error_msg)
           log.debug('Retrying in {0} seconds...  {1} attempts left.'.format(wait_time_between_api_call_retries,retry))
           time.sleep(wait_time_between_api_call_retries)
@@ -118,11 +118,11 @@ class CreateNode(Command):
               auth=get_auth(resource_handler.auth_data))
         if r.status_code != 204:
             error_msg = '[{0}] Deleting cloned drive {1} failed! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
-                        resource_handler.name, drv_id, r.status_code, 
-                        httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+                        resource_handler.name, drv_id, r.status_code,
+                        http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
             return error_msg
         return None
-        
+
 
     @wet_method(['unmounted',""])
     def _get_drive_status(self, resource_handler, drv_id):
@@ -130,8 +130,8 @@ class CreateNode(Command):
             auth=get_auth(resource_handler.auth_data))
         retry=max_number_of_api_call_retries
         while r.status_code != 200 and retry>0:
-          error_msg = '[{0}] Failed to query status of drive {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(resource_handler.name, drv_id, r.status_code, 
-                httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+          error_msg = '[{0}] Failed to query status of drive {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(resource_handler.name, drv_id, r.status_code,
+                http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
           log.debug(error_msg)
           log.debug('Retrying in {0} seconds...  {1} attempts left.'.format(wait_time_between_api_call_retries,retry))
           time.sleep(wait_time_between_api_call_retries)
@@ -140,8 +140,8 @@ class CreateNode(Command):
               auth=get_auth(resource_handler.auth_data))
         if r.status_code != 200:
             error_msg = '[{0}] Failed to query status of drive {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
-                        resource_handler.name, drv_id, r.status_code, 
-                        httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+                        resource_handler.name, drv_id, r.status_code,
+                        http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
             return 'unknown', error_msg
         st = r.json()['status']
         log.debug('[%s] Status of drive %s is: %s', resource_handler.name, drv_id, st)
@@ -160,7 +160,7 @@ class CreateNode(Command):
         if context is not None:
             descr['meta'] = {
                 'base64_fields': 'cloudinit-user-data',
-                'cloudinit-user-data': base64.b64encode(context)
+                'cloudinit-user-data': base64.b64encode(context.encode('utf-8')).decode('utf-8')
             }
         if 'vnc_password' not in descr:
             descr['vnc_password'] = self.resolved_node_definition.get('node_id', "occopus")
@@ -182,8 +182,8 @@ class CreateNode(Command):
         retry=max_number_of_api_call_retries
         while r.status_code not in [201] and retry>0:
           error_msg = '[{0}] Failed to create server! HTTP response code/message: {1}/{2}. Server response: {3}.'.format(
-                        resource_handler.name, r.status_code, 
-                        httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+                        resource_handler.name, r.status_code,
+                        http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
           log.debug(error_msg)
           log.debug('Returned json: {0}'.format(r.json().dumps()))
           log.debug('Retrying in {0} seconds...  {1} attempts left.'.format(wait_time_between_api_call_retries,retry))
@@ -193,8 +193,8 @@ class CreateNode(Command):
               auth=get_auth(resource_handler.auth_data), json=json_data)
         if r.status_code != 201:
             error_msg = '[{0}] Failed to create server! HTTP response code/message: {1}/{2}. Server response: {3}.'.format(
-                        resource_handler.name, r.status_code, 
-                        httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+                        resource_handler.name, r.status_code,
+                        http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
             return None, error_msg
         srv_uuid = r.json()['objects'][0]['uuid']
         log.debug('[%s] Created server\'s UUID is: %s', resource_handler.name, srv_uuid)
@@ -208,8 +208,8 @@ class CreateNode(Command):
         retry=max_number_of_api_call_retries
         while r.status_code != 204 and retry>0:
           error_msg = '[{0}] Failed to delete server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
-            resource_handler.name, srv_id, r.status_code, 
-            httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+            resource_handler.name, srv_id, r.status_code,
+            http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
           log.debug(error_msg)
           log.debug('Retrying in {0} seconds...  {1} attempts left.'.format(wait_time_between_api_call_retries,retry))
           time.sleep(wait_time_between_api_call_retries)
@@ -219,8 +219,8 @@ class CreateNode(Command):
               headers={'Content-type': 'application/json'})
         if r.status_code != 204:
             error_msg = '[{0}] Failed to delete server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
-                        resource_handler.name, srv_id, r.status_code, 
-                        httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+                        resource_handler.name, srv_id, r.status_code,
+                        http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
             return error_msg
         return None
 
@@ -230,8 +230,8 @@ class CreateNode(Command):
             auth=get_auth(resource_handler.auth_data), params={'do': 'start'})
         if r.status_code != 202:
             error_msg = '[{0}] Failed to start server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
-                        resource_handler.name, srv_id, r.status_code, 
-                        httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+                        resource_handler.name, srv_id, r.status_code,
+                        http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
             return False, error_msg
         return True, ""
 
@@ -241,8 +241,8 @@ class CreateNode(Command):
             auth=get_auth(resource_handler.auth_data), params={'do': 'stop'})
         if r.status_code != 202:
              error_msg = '[{0}] Failed to stop server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
-                         resource_handler.name, srv_id, r.status_code, 
-                         httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+                         resource_handler.name, srv_id, r.status_code,
+                         http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
              return False, error_msg
         return True, ""
 
@@ -286,13 +286,13 @@ class CreateNode(Command):
                       self._stop_server(resource_handler, srv_id)
                     srv_st = get_server_status(resource_handler, srv_id)
                 self._delete_server(resource_handler, srv_id)
-            if drv_id:
-                drv_st, _ = self._get_drive_status(resource_handler, drv_id)
-                while drv_st not in ['unmounted','unknown']:
-                    log.debug("[%s] Drive is in %s state.",resource_handler.name, drv_st)
-                    time.sleep(wait_time_between_api_call_retries)
-                    drv_st, _ = self._get_drive_status(resource_handler, drv_id)
-                self._delete_drive(resource_handler, drv_id)
+            # if drv_id:
+            #     drv_st, _ = self._get_drive_status(resource_handler, drv_id)
+            #     while drv_st not in ['unmounted','unknown']:
+            #         log.debug("[%s] Drive is in %s state.",resource_handler.name, drv_st)
+            #         time.sleep(wait_time_between_api_call_retries)
+            #         drv_st, _ = self._get_drive_status(resource_handler, drv_id)
+            #     self._delete_drive(resource_handler, drv_id)
             raise
         return srv_id
 
@@ -307,8 +307,8 @@ class DropNode(Command):
             auth=get_auth(resource_handler.auth_data), params={'do': 'stop'})
         if r.status_code != 202:
              error_msg = '[{0}] Failed to stop server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
-                         resource_handler.name, srv_id, r.status_code, 
-                         httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+                         resource_handler.name, srv_id, r.status_code,
+                         http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
              return False, error_msg
         return True, ""
 
@@ -320,8 +320,8 @@ class DropNode(Command):
         retry=max_number_of_api_call_retries
         while r.status_code != 204 and retry>0:
           error_msg = '[{0}] Failed to delete server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
-            resource_handler.name, srv_id, r.status_code, 
-            httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+            resource_handler.name, srv_id, r.status_code,
+            http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
           log.debug(error_msg)
           log.debug('Retrying in {0} seconds...  {1} attempts left.'.format(wait_time_between_api_call_retries,retry))
           time.sleep(wait_time_between_api_call_retries)
@@ -331,8 +331,8 @@ class DropNode(Command):
               headers={'Content-type': 'application/json'})
         if r.status_code != 204:
             error_msg = '[{0}] Failed to delete server {1}! HTTP response code/message: {2}/{3}. Server response: {4}.'.format(
-                        resource_handler.name, srv_id, r.status_code, 
-                        httplib.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
+                        resource_handler.name, srv_id, r.status_code,
+                        http.client.responses.get(r.status_code,"(undefined http code returned by CloudSigma API)"), r.text)
             return error_msg
         return None
 
@@ -347,7 +347,7 @@ class DropNode(Command):
         srv_id = self.instance_data.get('instance_id')
         if not srv_id:
             return
-        
+
         log.debug("[%s] Deleting server %r", resource_handler.name,
                 self.instance_data['node_id'])
 
@@ -496,4 +496,3 @@ class CloudSigmaSchemaChecker(RHSchemaChecker):
             msg = "Unknown key(s): " + ', '.join(str(key) for key in invalid_keys)
             raise SchemaError(msg)
         return True
-

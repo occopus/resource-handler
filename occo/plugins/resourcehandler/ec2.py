@@ -20,10 +20,10 @@
 
 # To avoid self-importing *this* ec2.py module (we need the "real" one
 # provided by the boto package).
-from __future__ import absolute_import
+
 import boto
 import boto.ec2
-import urlparse
+from urllib.parse import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce
 from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
@@ -51,7 +51,7 @@ def setup_connection(endpoint, regionname, auth_data):
     """
     Setup the connection to the EC2 server.
     """
-    url = urlparse.urlparse(endpoint)
+    url = urlparse(endpoint)
     region = boto.ec2.regioninfo.RegionInfo(
         name=regionname, endpoint=url.hostname)
     log.debug('Connecting to url %r %r as %r',
@@ -98,7 +98,7 @@ class CreateNode(Command):
         :Remark: This is a "wet method", the VM will not be started
             if the instance is in debug mode (``dry_run``).
         """
-	rnd = self.resolved_node_definition
+        rnd = self.resolved_node_definition
         image_id = rnd['resource']['image_id']
         instance_type = rnd['resource']['instance_type']
         context = rnd.get('context',None)
@@ -112,7 +112,7 @@ class CreateNode(Command):
                                               subnet_id=subnet_id,
                                               security_group_ids=sec_group_ids)
         vm_id = reservation.instances[0].id
-      
+
         tags = rnd['resource'].get('tags', None)
         if tags:
           instance = reservation.instances[0]
@@ -144,7 +144,7 @@ class CreateNode(Command):
 class DropNode(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
-        self.instance_data = instance_data    
+        self.instance_data = instance_data
 
     @wet_method()
     @needs_connection
@@ -180,7 +180,7 @@ class GetState(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
         self.instance_data = instance_data
-    
+
     @wet_method('ready')
     @needs_connection
     def perform(self, resource_handler):
@@ -201,7 +201,7 @@ class GetIpAddress(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
         self.instance_data = instance_data
-    
+
     @wet_method('127.0.0.1')
     @needs_connection
     def perform(self, resource_handler):
@@ -209,8 +209,8 @@ class GetIpAddress(Command):
                   resource_handler.name,
                   self.instance_data['node_id'])
         inst = get_instance(self.conn, self.instance_data['instance_id'])
-        ip_address = None if inst.ip_address is '' else inst.ip_address
-        private_ip_address = None if inst.private_ip_address is '' else inst.private_ip_address
+        ip_address = None if inst.ip_address == '' else inst.ip_address
+        private_ip_address = None if inst.private_ip_address == '' else inst.private_ip_address
         log.debug("[%s] Priv IP address for %r is \"%s\"",
                   resource_handler.name,
                   self.instance_data['node_id'],
@@ -221,7 +221,7 @@ class GetAddress(Command):
     def __init__(self, instance_data):
         Command.__init__(self)
         self.instance_data = instance_data
-    
+
     @wet_method('127.0.0.1')
     @needs_connection
     def perform(self, resource_handler):
@@ -229,9 +229,9 @@ class GetAddress(Command):
                   resource_handler.name,
                   self.instance_data['node_id'])
         inst = get_instance(self.conn, self.instance_data['instance_id'])
-        public_dns_name = None if inst.public_dns_name is '' else inst.public_dns_name
-        ip_address = None if inst.ip_address is '' else inst.ip_address
-        private_ip_address = None if inst.private_ip_address is '' else inst.private_ip_address
+        public_dns_name = None if inst.public_dns_name == '' else inst.public_dns_name
+        ip_address = None if inst.ip_address == '' else inst.ip_address
+        private_ip_address = None if inst.private_ip_address == '' else inst.private_ip_address
         log.debug("[%s] Addresses for %r are \"%s\", \"%s\", \"%s\"",
                   resource_handler.name,
                   self.instance_data['node_id'],
@@ -265,7 +265,7 @@ class EC2ResourceHandler(ResourceHandler):
     .. _Boto: https://boto.readthedocs.org/en/latest/
     .. _EC2: http://aws.amazon.com/ec2/
     """
-    def __init__(self, endpoint, regionname, auth_data, 
+    def __init__(self, endpoint, regionname, auth_data,
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
@@ -289,10 +289,10 @@ class EC2ResourceHandler(ResourceHandler):
 
     def cri_get_state(self, instance_data):
         return GetState(instance_data)
-    
+
     def cri_get_address(self, instance_data):
         return GetAddress(instance_data)
-    
+
     def cri_get_ip_address(self, instance_data):
         return GetIpAddress(instance_data)
 

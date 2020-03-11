@@ -18,8 +18,7 @@
 .. moduleauthor:: Zoltan Farkas <zoltan.farkas@sztaki.mta.hu>
 """
 
-from __future__ import absolute_import
-import urlparse
+from urllib.parse import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce
 from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
@@ -96,11 +95,14 @@ class CreateNode(Command):
         descr.setdefault('isolated', 'true')
         context = self.resolved_node_definition.get('context', None)
         if context is not None:
-            descr['cloud-init'] = base64.b64encode(context)
+            descr['cloud-init'] = base64.b64encode(context.encode('utf-8')).decode('utf-8')
             descr['cloud-init-b64'] = 'true'
-        log.debug("[%s] XML to pass to CloudBroker: %s", 
+        start_in_vpc = self.resolved_node_definition.get('start_in_vpc', None)
+        if start_in_vpc is not None:
+            descr['start-in-vpc'] = start_in_vpc
+        log.debug("[%s] XML to pass to CloudBroker: %s",
                   resource_handler.name, dicttoxml(descr, custom_root='instance', attr_type=False))
-        r = requests.post(resource_handler.endpoint + '/instances.xml', 
+        r = requests.post(resource_handler.endpoint + '/instances.xml',
                           dicttoxml(descr, custom_root='instance', attr_type=False),
                           auth=get_auth(resource_handler.auth_data),
                           headers={'Content-Type': 'application/xml'})
@@ -116,7 +118,7 @@ class CreateNode(Command):
             errormsg = '[{0}] Failed to create CloudBroker instance, request status code {1}, response: {2}'.format(
                        resource_handler.name, r.status_code, r.text)
             log.debug(errormsg)
-            raise NodeCreationError(None, errormsg) 
+            raise NodeCreationError(None, errormsg)
 
     def perform(self, resource_handler):
         log.debug("[%s] Creating node: %r",
@@ -174,12 +176,12 @@ class GetState(Command):
         instance = get_instance(resource_handler, self.instance_data['instance_id'])
         stat = getTagText(instance.getElementsByTagName('status').item(0).childNodes)
         statusMap = {
-            u'starting': status.PENDING,
-            u'initializing': status.PENDING,
-            u'preparing': status.PENDING,
-            u'running': status.READY,
-            u'stopping': status.SHUTDOWN,
-            u'halted': status.SHUTDOWN,
+            'starting': status.PENDING,
+            'initializing': status.PENDING,
+            'preparing': status.PENDING,
+            'running': status.READY,
+            'stopping': status.SHUTDOWN,
+            'halted': status.SHUTDOWN,
         }
         retval = statusMap.get(stat)
         if not retval:
@@ -198,7 +200,7 @@ class GetIpAddress(Command):
         ext_ip = getTagText(instance.getElementsByTagName('external-ip-address').item(0).childNodes)
         log.debug("[%s] Internal IP is: %s, External IP is: %s", resource_handler.name,
                 int_ip, ext_ip)
-        return coalesce(ext_ip, int_ip)
+        return int_ip
 
 class GetAddress(Command):
     def __init__(self, instance_data):
@@ -214,7 +216,13 @@ class GetAddress(Command):
         ext_ip = getTagText(instance.getElementsByTagName('external-ip-address').item(0).childNodes)
         log.debug("[%s] Internal IP is: %s, External IP is: %s, Internal hostname is: %s, External hostname is: %s",
                 resource_handler.name, int_ip, ext_ip, int_dns, ext_dns)
-        return coalesce(ext_dns, ext_ip, int_dns, int_ip)
+        addresses = list()
+        addresses = addresses[:]+[ext_dns] if ext_dns  else addresses
+        addresses = addresses[:]+[ext_ip] if ext_ip else addresses
+        addresses = addresses[:]+[int_dns] if int_dns else addresses
+        addresses = addresses[:]+[int_ip] if int_ip else addresses
+        addresses = [''] if addresses == [] else addresses
+        return addresses
 
 @factory.register(ResourceHandler, PROTOCOL_ID)
 class CloudBrokerResourceHandler(ResourceHandler):
@@ -270,7 +278,7 @@ class CloudbrokerSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "description"]
         self.req_desc_keys = ["deployment_id", "instance_type_id"]
-        self.opt_keys = ["name"]
+        self.opt_keys = ["name", "start_in_vpc"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
@@ -286,4 +294,3 @@ class CloudbrokerSchemaChecker(RHSchemaChecker):
             msg = "Unknown key(s): " + ', '.join(str(key) for key in invalid_keys)
             raise SchemaError(msg)
         return True
-
