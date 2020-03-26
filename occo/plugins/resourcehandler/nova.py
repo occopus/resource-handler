@@ -330,7 +330,7 @@ class GetAnyIpAddress(Command):
         networks = self.conn.servers.ips(server)
         for tenant in list(networks.keys()):
             for addre in networks[tenant]:
-                return addre['addr'].encode('latin-1')
+                return addre['addr']
         return None
 
 class GetPrivIpAddress(Command):
@@ -355,7 +355,7 @@ class GetPrivIpAddress(Command):
         for tenant in list(networks.keys()):
             log.debug("[%s] networks[tenant]: %s",resource_handler.name,networks[tenant])
             for addre in networks[tenant]:
-                ip = addre['addr'].encode('latin-1')
+                ip = addre['addr']
                 private_ip = ip
                 for floating_ip in floating_ips:
                     if floating_ip.instance_id == server.id:
