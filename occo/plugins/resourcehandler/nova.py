@@ -68,7 +68,7 @@ def setup_connection(endpoint, auth_data, resolved_node_definition):
             auth = v3.Password(auth_url=endpoint, username=user, password=password, project_id=project_id, user_domain_name=user_domain_name)
             sess = session.Session(auth=auth)
             nt = novaclient.client.Client(2, session=sess, region_name=region_name)
-    elif auth_data.get('type',None) == 'v3applicationcredential':
+    elif auth_data.get('type',None) == 'application_credential':
         cred_id = auth_data['id']
         cred_secret = auth_data['secret']
         if tenant_name is None:
@@ -399,9 +399,9 @@ class NovaResourceHandler(ResourceHandler):
            ((not "type" in auth_data) and \
              ((not "username" in auth_data) or (not "password" in auth_data))) or \
            (("type" in auth_data) and \
-             ((not "v3applicationcredential" in auth_data['type']) and \
+             ((not "application_credential" in auth_data['type']) and \
               (not "voms" in auth_data['type']))) or \
-           (("type" in auth_data) and ("v3applicationcredential" in auth_data['type']) and \
+           (("type" in auth_data) and ("application_credential" in auth_data['type']) and \
              ((not "id" in auth_data) or (not "secret" in auth_data))) or \
            (("type" in auth_data) and ("voms" in auth_data['type']) and (not "proxy" in auth_data)):
             errormsg = "Cannot find credentials for \""+endpoint+"\". Found only: \""+str(auth_data)+"\". Please, specify!"
