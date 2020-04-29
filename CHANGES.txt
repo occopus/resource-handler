@@ -1,3 +1,13 @@
+v1.7 - Apr 2020
+- fixes in cloudsigma plugin
+- added keystone v3 support to nova plugin
+- return multi addresses of nodes
+- add ApplicationCredential auth type handling to nova
+- add region selection to nova
+- py3 porting
+- added azure plugin
+- remove ip duplicats in ec2 and clbr plugins
+
 v1.6 - Apr 2019
 - Remove req import from setup.py
 - Fixes in cloudsigma plugin (start server timeout, error code, ip retrieval)
