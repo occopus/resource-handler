@@ -49,7 +49,7 @@ class RHSchemaChecker(factory.MultiBackend):
             if rkey not in data:
                 missing_keys.append(rkey)
         return missing_keys
-    
+
     def get_invalid_keys(self, data, valid_keys):
         invalid_keys = list()
         for key in data:
@@ -66,7 +66,7 @@ class ResourceHandler(factory.MultiBackend):
     performing Resource Handler instructions.
     """
     def __init__(self):
-	return
+        return
 
     def perform(self, instruction):
         raise NotImplementedError()
@@ -97,7 +97,7 @@ class ResourceHandler(factory.MultiBackend):
         raise NotImplementedError()
 
     def instantiate_rh(self, data):
-	cfg=data['resource']
+        cfg=data['resource']
         auth_data = ib.real_main_info_broker.get('backends.auth_data',"resource",cfg)
         return ResourceHandler.instantiate(\
                protocol=data['resource']['type'],\
@@ -123,7 +123,7 @@ class ResourceHandler(factory.MultiBackend):
     def get_ip_address(self, instance_data):
         rh = self.instantiate_rh(instance_data)
         return rh.cri_get_ip_address(instance_data).perform(rh)
-        
+
 @ib.provider
 class ResourceHandlerProvider(ib.InfoProvider):
     def __init__(self, resource_handler, **config):

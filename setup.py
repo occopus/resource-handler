@@ -17,7 +17,7 @@ import setuptools
 
 setuptools.setup(
     name='OCCO-ResourceHandler',
-    version='1.6',
+    version='1.7',
     author='MTA SZTAKI',
     author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
@@ -26,10 +26,11 @@ setuptools.setup(
         'occo.plugins.resourcehandler',
     ],
     py_modules=[
+        'occo.plugins.resourcehandler.ec2',
         'occo.plugins.resourcehandler.nova',
+        'occo.plugins.resourcehandler.azure',
         'occo.plugins.resourcehandler.cloudbroker',
         'occo.plugins.resourcehandler.cloudsigma',
-        'occo.plugins.resourcehandler.ec2',
 	'occo.plugins.resourcehandler.docker',
 	'occo.plugins.resourcehandler.occi'
     ],
@@ -42,6 +43,10 @@ setuptools.setup(
     description='Occopus Resource Handler',
     long_description=open('README.txt').read(),
     install_requires=[
+        'azure-common',
+        'azure-mgmt-compute',
+        'azure-mgmt-network',
+        'azure-mgmt-resource',
         'argparse',
         'backports.ssl-match-hostname',
         'boto',
@@ -54,9 +59,8 @@ setuptools.setup(
         'OCCO-InfoBroker',
         'requests',
         'websocket-client',
-        'python-novaclient',
+        'python-novaclient==3.4.0',
         'ruamel.yaml',
-        'ruamel.ordereddict',
         'voms-auth-system-openstack',
         'unicodecsv',
         'simplejson'

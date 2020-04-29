@@ -14,10 +14,10 @@ fi
 
 rm -rf $PDIR
 mkdir -p wheelhouse
-virtualenv --no-site-packages $PDIR
+virtualenv -p python3 $PDIR
 source $PDIR/bin/activate
 pip install --upgrade pip
 pip install wheel
-pip wheel --wheel-dir=wheelhouse --find-links http://pip.lpds.sztaki.hu/packages --trusted-host pip.lpds.sztaki.hu .
+pip wheel --index-url https://pip3.lpds.sztaki.hu -w wheelhouse .
 deactivate
 rm -rf $PDIR

@@ -24,9 +24,9 @@ import random
 import novaclient
 import novaclient.client
 import novaclient.auth_plugin
-from keystoneauth1 import loading
+from keystoneauth1.identity import v3
 from keystoneauth1 import session
-import urlparse
+from urllib.parse import urlparse
 import occo.util.factory as factory
 from occo.util import wet_method, coalesce, unique_vmname
 from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
@@ -58,21 +58,30 @@ def setup_connection(endpoint, auth_data, resolved_node_definition):
     tenant_name = resolved_node_definition['resource'].get('tenant_name', None)
     project_id = resolved_node_definition['resource'].get('project_id', None)
     user_domain_name = resolved_node_definition['resource'].get('user_domain_name', 'Default')
-    if auth_data.get('type',None) is None:
+    region_name = resolved_node_definition['resource'].get('region_name', None)
+    if auth_data.get('type', None) is None:
         user = auth_data['username']
         password = auth_data['password']
         if tenant_name is not None:
-            nt = novaclient.client.Client('2.0', user, password, tenant_name, endpoint)
+            nt = novaclient.client.Client('2.0', user, password, tenant_name, endpoint, region_name=region_name)
         else:
-            loader = loading.get_plugin_loader('password')
-            auth = loader.load_from_options(auth_url=endpoint, username=user, password=password, project_id=project_id, user_domain_name=user_domain_name)
+            auth = v3.Password(auth_url=endpoint, username=user, password=password, project_id=project_id, user_domain_name=user_domain_name)
             sess = session.Session(auth=auth)
-            nt = novaclient.client.Client(2, session=sess)
+            nt = novaclient.client.Client(2, session=sess, region_name=region_name)
+    elif auth_data.get('type',None) == 'application_credential':
+        cred_id = auth_data['id']
+        cred_secret = auth_data['secret']
+        if tenant_name is None:
+            auth = v3.ApplicationCredential(auth_url = endpoint,
+                                            application_credential_secret = cred_secret,
+                                            application_credential_id = cred_id)
+            sess = session.Session(auth=auth)
+            nt = novaclient.client.Client(2, session=sess, region_name=region_name)
     elif auth_data.get('type',None) == 'voms':
         novaclient.auth_plugin.discover_auth_systems()
         auth_plugin = novaclient.auth_plugin.load_plugin('voms')
         auth_plugin.opts["x509_user_proxy"] = auth_data['proxy']
-        nt = novaclient.client.Client('2.0', None, None, tenant_name, endpoint, auth_plugin=auth_plugin, auth_system='voms')
+        nt = novaclient.client.Client('2.0', None, None, tenant_name, endpoint, auth_plugin=auth_plugin, auth_system='voms',region_name=region_name)
     return nt
 
 def needs_connection(f):
@@ -159,14 +168,14 @@ class CreateNode(Command):
                     raise NodeCreationError(None, str(ex))
             raise
         except Exception as ex:
-            raise NodeCreationError(None, str(ex)) 
+            raise NodeCreationError(None, str(ex))
         return server
 
     def _allocate_floating_ip(self, resource_handler,server):
         pool = self.resolved_node_definition['resource'].get('floating_ip_pool', None)
         if ('floating_ip' not in self.resolved_node_definition['resource']) and (pool is None):
             return
-        flip_waiting = 5 
+        flip_waiting = 10
         flip_attempts = 60
         attempts = 1
         while attempts <= flip_attempts:
@@ -185,7 +194,7 @@ class CreateNode(Command):
             log.debug("[%s] List of unused floating ips: %s", resource_handler.name, str([ ip.ip for ip in unused_ips]))
             floating_ip = random.choice(unused_ips)
             try:
-                log.debug("[%s] Try associating floating ip (%s) to server (%s)...", 
+                log.debug("[%s] Try associating floating ip (%s) to server (%s)...",
                           resource_handler.name, floating_ip.ip, server.id)
                 server.add_floating_ip(floating_ip)
                 time.sleep(random.randint(1,5))
@@ -219,7 +228,7 @@ class CreateNode(Command):
         log.debug("[%s] Creating node: %r",
                   resource_handler.name, self.resolved_node_definition['name'])
         try:
-            server = None 
+            server = None
             server = self._start_instance(resource_handler, self.resolved_node_definition)
             log.debug("[%s] Server instance created, id: %r", resource_handler.name, server.id)
             self._allocate_floating_ip(resource_handler,server)
@@ -284,7 +293,7 @@ class GetState(Command):
     def perform(self, resource_handler):
         log.debug("[%s] Acquiring node state %r",
                   resource_handler.name, self.instance_data['node_id'])
-        try: 
+        try:
             server = self.conn.servers.get(self.instance_data['instance_id'])
         except Exception as ex:
             raise NodeCreationError(None, str(ex))
@@ -319,9 +328,9 @@ class GetAnyIpAddress(Command):
             if floating_ip.instance_id == server.id:
                 return floating_ip.ip
         networks = self.conn.servers.ips(server)
-        for tenant in networks.keys():
+        for tenant in list(networks.keys()):
             for addre in networks[tenant]:
-                return addre['addr'].encode('latin-1')
+                return addre['addr']
         return None
 
 class GetPrivIpAddress(Command):
@@ -343,10 +352,10 @@ class GetPrivIpAddress(Command):
         ip = ""
         floating_ips = self.conn.floating_ips.list()
         networks = self.conn.servers.ips(server)
-        for tenant in networks.keys():
+        for tenant in list(networks.keys()):
             log.debug("[%s] networks[tenant]: %s",resource_handler.name,networks[tenant])
             for addre in networks[tenant]:
-                ip = addre['addr'].encode('latin-1')
+                ip = addre['addr']
                 private_ip = ip
                 for floating_ip in floating_ips:
                     if floating_ip.instance_id == server.id:
@@ -355,8 +364,8 @@ class GetPrivIpAddress(Command):
                 if private_ip != "":
                   log.debug("[%s] Private ip found: %s",resource_handler.name,private_ip)
                   return private_ip
-        log.debug("[%s] Private ip not found.",resource_handler.name,ip)
-        return None 
+        log.debug("[%s] Private ip not found.",resource_handler.name)
+        return None
 
 @factory.register(ResourceHandler, PROTOCOL_ID)
 class NovaResourceHandler(ResourceHandler):
@@ -386,9 +395,16 @@ class NovaResourceHandler(ResourceHandler):
         self.dry_run = dry_run
         self.name = name if name else endpoint
         self.endpoint = endpoint
-        if (not auth_data) or (((not "username" in auth_data) or (not "password" in auth_data)) and \
-            ((not "type" in auth_data) or (not "proxy" in auth_data))):
-            errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
+        if (not auth_data) or \
+           ((not "type" in auth_data) and \
+             ((not "username" in auth_data) or (not "password" in auth_data))) or \
+           (("type" in auth_data) and \
+             ((not "application_credential" in auth_data['type']) and \
+              (not "voms" in auth_data['type']))) or \
+           (("type" in auth_data) and ("application_credential" in auth_data['type']) and \
+             ((not "id" in auth_data) or (not "secret" in auth_data))) or \
+           (("type" in auth_data) and ("voms" in auth_data['type']) and (not "proxy" in auth_data)):
+            errormsg = "Cannot find credentials for \""+endpoint+"\". Found only: \""+str(auth_data)+"\". Please, specify!"
             raise NodeCreationError(None,errormsg)
         self.auth_data = auth_data
         self.data = config
@@ -413,12 +429,12 @@ class NovaResourceHandler(ResourceHandler):
 
     def perform(self, instruction):
         instruction.perform(self)
-    
+
 @factory.register(RHSchemaChecker, PROTOCOL_ID)
 class NovaSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "image_id", "flavor_name"]
-        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip", "name", "project_id", "tenant_name", "user_domain_name", "network_id", "floating_ip_pool"]
+        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip", "name", "project_id", "tenant_name", "user_domain_name", "network_id", "floating_ip_pool", "region_name"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
@@ -430,4 +446,3 @@ class NovaSchemaChecker(RHSchemaChecker):
             msg = "Unknown key(s): " + ', '.join(str(key) for key in invalid_keys)
             raise SchemaError(msg)
         return True
-
