@@ -32,6 +32,7 @@ import logging
 import occo.constants.status as status
 from occo.exceptions import SchemaError,NodeCreationError
 import time
+from collections import OrderedDict
 
 __all__ = ['EC2ResourceHandler']
 
@@ -242,7 +243,8 @@ class GetAddress(Command):
         addresses = addresses[:]+[public_dns_name] if public_dns_name else addresses
         addresses = addresses[:]+[ip_address] if ip_address else addresses
         addresses = addresses[:]+[private_ip_address] if private_ip_address else addresses
-        return addresses
+        retaddr = list(OrderedDict.fromkeys(addresses))
+        return retaddr
 
 @factory.register(ResourceHandler, PROTOCOL_ID)
 class EC2ResourceHandler(ResourceHandler):
