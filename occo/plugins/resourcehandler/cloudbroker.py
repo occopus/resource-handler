@@ -34,6 +34,7 @@ from time import sleep
 import xml.etree.ElementTree as ET
 from occo.exceptions import SchemaError, NodeCreationError
 from dicttoxml import dicttoxml
+from collections import OrderedDict
 
 __all__ = ['CloudBrokerResourceHandler']
 
@@ -222,7 +223,8 @@ class GetAddress(Command):
         addresses = addresses[:]+[int_dns] if int_dns else addresses
         addresses = addresses[:]+[int_ip] if int_ip else addresses
         addresses = [''] if addresses == [] else addresses
-        return addresses
+        retaddr = list(OrderedDict.fromkeys(addresses))
+        return retaddr
 
 @factory.register(ResourceHandler, PROTOCOL_ID)
 class CloudBrokerResourceHandler(ResourceHandler):
