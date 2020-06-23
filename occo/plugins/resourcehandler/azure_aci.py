@@ -42,6 +42,7 @@ from azure.mgmt.containerinstance.models import (ContainerGroup,
                                                  ContainerGroupRestartPolicy,
                                                  ContainerPort,
                                                  EnvironmentVariable,
+                                                 GpuResource,
                                                  IpAddress,
                                                  Port,
                                                  ResourceRequests,
@@ -104,7 +105,7 @@ class CreateNode(Command):
         self.node_def = resolved_node_definition
         self.res = self.node_def['resource']
         self.command = self.node_def.get('attributes', dict()).get('command', None)
-        self.env = self.node_def.get('attributes', dict()).get('env', None)
+        self.env = self.node_def.get('attributes', dict()).get('env', [])
         Command.__init__(self)
         self.created_resources = {}
 
@@ -120,7 +121,9 @@ class CreateNode(Command):
         #     resolved_context = None
         # customdata = base64.b64encode(resolved_context.encode('utf-8')).decode('utf-8') if resolved_context else None
         if 'gpu_type' in self.res:
-            container_resource_requests = ResourceRequests(memory_in_gb=self.res['memory'], cpu=self.res['cpu_cores'], gpu=self.res['gpu_type'])
+            count = self.res['gpu_count'] if 'gpu_count' in self.res else 1
+            gpu = GpuResource(count=count, sku=self.res['gpu_type'])
+            container_resource_requests = ResourceRequests(memory_in_gb=self.res['memory'], cpu=self.res['cpu_cores'], gpu=gpu)
         else:
             container_resource_requests = ResourceRequests(memory_in_gb=self.res['memory'], cpu=self.res['cpu_cores'])
         container_resource_requirements = ResourceRequirements(requests=container_resource_requests)
@@ -427,7 +430,7 @@ class AzureACISchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "resource_group", "location", "cpu_cores",
                          "memory", "image", "os_type", "network_type"]
-        self.opt_keys = ["gpu_type", "ports", "vnet_name", "subnet_name"]
+        self.opt_keys = ["gpu_type", "gpu_count", "ports", "vnet_name", "subnet_name"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
