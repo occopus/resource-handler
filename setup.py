@@ -29,10 +29,10 @@ setuptools.setup(
         'occo.plugins.resourcehandler.ec2',
         'occo.plugins.resourcehandler.nova',
         'occo.plugins.resourcehandler.azure',
+        'occo.plugins.resourcehandler.azure_aci',
         'occo.plugins.resourcehandler.cloudbroker',
         'occo.plugins.resourcehandler.cloudsigma',
-	'occo.plugins.resourcehandler.docker',
-	'occo.plugins.resourcehandler.occi'
+        'occo.plugins.resourcehandler.docker',
     ],
     packages=[
         'occo.resourcehandler',
