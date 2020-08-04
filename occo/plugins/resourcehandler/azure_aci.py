@@ -116,10 +116,6 @@ class CreateNode(Command):
         self.resource_client.resource_groups.create_or_update(
             self.res['resource_group'], {'location': self.res['location']})
         container_group_name = unique_vmname(self.node_def)
-        # resolved_context = self.node_def.get("context")
-        # if resolved_context == "":
-        #     resolved_context = None
-        # customdata = base64.b64encode(resolved_context.encode('utf-8')).decode('utf-8') if resolved_context else None
         if 'gpu_type' in self.res:
             count = self.res['gpu_count'] if 'gpu_count' in self.res else 1
             gpu = GpuResource(count=count, sku=self.res['gpu_type'])
@@ -147,7 +143,7 @@ class CreateNode(Command):
                           image=self.res['image'],
                           resources=container_resource_requirements,
                           ports=ports,
-                          command=self.command.split() if self.command is not None else None,
+                          command=self.command if self.command is not None else None,
                           environment_variables=environment)
         network_type = self.res['network_type']
         network_profile = None
