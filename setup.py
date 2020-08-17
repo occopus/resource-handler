@@ -47,6 +47,7 @@ setuptools.setup(
         'azure-mgmt-compute',
         'azure-mgmt-network',
         'azure-mgmt-resource',
+        'azure-mgmt-containerinstance',
         'argparse',
         'backports.ssl-match-hostname',
         'boto',
