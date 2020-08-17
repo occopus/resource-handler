@@ -17,7 +17,7 @@ import setuptools
 
 setuptools.setup(
     name='OCCO-ResourceHandler',
-    version='1.7',
+    version='1.8',
     author='MTA SZTAKI',
     author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
@@ -28,11 +28,11 @@ setuptools.setup(
     py_modules=[
         'occo.plugins.resourcehandler.ec2',
         'occo.plugins.resourcehandler.nova',
-        'occo.plugins.resourcehandler.azure',
+        'occo.plugins.resourcehandler.azure_vm',
+        'occo.plugins.resourcehandler.azure_aci',
         'occo.plugins.resourcehandler.cloudbroker',
         'occo.plugins.resourcehandler.cloudsigma',
-	'occo.plugins.resourcehandler.docker',
-	'occo.plugins.resourcehandler.occi'
+        'occo.plugins.resourcehandler.docker',
     ],
     packages=[
         'occo.resourcehandler',
@@ -47,6 +47,7 @@ setuptools.setup(
         'azure-mgmt-compute',
         'azure-mgmt-network',
         'azure-mgmt-resource',
+        'azure-mgmt-containerinstance',
         'argparse',
         'backports.ssl-match-hostname',
         'boto',
