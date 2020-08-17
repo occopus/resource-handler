@@ -1,3 +1,7 @@
+v1.8 - Aug 2020
+- Add Azure ACI (container) plugin
+- Remove OCCI plugin
+
 v1.7 - Apr 2020
 - fixes in cloudsigma plugin
 - added keystone v3 support to nova plugin
