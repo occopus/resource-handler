@@ -42,7 +42,7 @@ import base64
 
 __all__ = ['AzureResourceHandler']
 
-PROTOCOL_ID = 'azure'
+PROTOCOL_ID = 'azure_vm'
 
 STATE_MAPPING = {
     'creating'            : status.PENDING,
