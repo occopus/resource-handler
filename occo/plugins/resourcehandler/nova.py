@@ -23,6 +23,7 @@ import uuid
 import random
 import novaclient
 import novaclient.client
+import openstack
 import novaclient.auth_plugin
 from keystoneauth1.identity import v3
 from keystoneauth1 import session
@@ -82,7 +83,17 @@ def setup_connection(endpoint, auth_data, resolved_node_definition):
         auth_plugin = novaclient.auth_plugin.load_plugin('voms')
         auth_plugin.opts["x509_user_proxy"] = auth_data['proxy']
         nt = novaclient.client.Client('2.0', None, None, tenant_name, endpoint, auth_plugin=auth_plugin, auth_system='voms',region_name=region_name)
-    return nt
+    os = openstack.connect(
+        auth_url=endpoint,
+        project_id=project_id,
+        username=auth_data['username'],
+        password=auth_data['password'],
+        region_name=region_name,
+        user_domain_name=user_domain_name,
+        project_domain_name=user_domain_name,
+        app_name='',
+        app_version='') if region_name != None else None
+    return (nt, os)
 
 def needs_connection(f):
     """
@@ -94,7 +105,9 @@ def needs_connection(f):
     import functools
     @functools.wraps(f)
     def g(self, resource_handler, *args, **kwargs):
-        self.conn = resource_handler.get_connection(self.resolved_node_definition)
+        (a, b) = resource_handler.get_connection(self.resolved_node_definition)
+        self.conn = a
+        self.connopenstack = b
         return f(self, resource_handler, *args, **kwargs)
 
     return g
@@ -179,40 +192,68 @@ class CreateNode(Command):
         flip_attempts = 60
         attempts = 1
         while attempts <= flip_attempts:
-            unused_ips = [addr for addr in self.conn.floating_ips.list() \
-                         if addr.instance_id is None and ( not pool or pool == addr.pool) ]
-            if not unused_ips:
-                if pool is not None:
-                    error_msg = '[{0}] Cannot find unused floating ip address in pool "{1}"!'.format(
-                          resource_handler.name, pool)
-                else:
-                    error_msg = '[{0}] Cannot find unused floating ip address!'.format(
-                          resource_handler.name)
-                server = self.conn.servers.get(server.id)
-                self.conn.servers.delete(server)
-                raise NodeCreationError(None, error_msg)
-            log.debug("[%s] List of unused floating ips: %s", resource_handler.name, str([ ip.ip for ip in unused_ips]))
-            floating_ip = random.choice(unused_ips)
-            try:
-                log.debug("[%s] Try associating floating ip (%s) to server (%s)...",
-                          resource_handler.name, floating_ip.ip, server.id)
-                server.add_floating_ip(floating_ip)
-                time.sleep(random.randint(1,5))
-                flips = self.conn.floating_ips.list()
-                log.debug("[%s] List of floating IPs: %s", resource_handler.name, flips)
-                myallocation = [ addr for addr in flips if addr.instance_id == server.id ]
-                if not myallocation:
-                    log.debug("SOMEONE took my ip meanwhile I was allocating it!")
-                    raise Exception
-                else:
-                    log.debug("ALLOCATION seemt to succeed: %r",myallocation[0])
-                    log.debug("[%s] Associating floating ip (%s) to node: success. Took %i seconds.", resource_handler.name, floating_ip.ip, (attempts - 1) * flip_waiting)
-                    break
-            except Exception as e:
-                log.debug(e)
-                log.debug("[%s] Associating floating ip (%s) to node failed. Retry after %i seconds...", resource_handler.name, floating_ip.ip, flip_waiting)
-                time.sleep(flip_waiting)
-                attempts += 1
+            if self.connopenstack != None:
+                floating_ip = self.connopenstack.network.find_available_ip()
+                if not floating_ip:
+                    floating_ip = self.connopenstack.network.create_ip(floating_network_id=pool)
+                if not floating_ip:
+                    error_msg = '[{0}] No usable floating ip address found!'.format(
+                        resource_handler.name)
+                    server = self.conn.servers.get(server.id)
+                    self.conn.servers.delete(server)
+                    raise NodeCreationError(None, error_msg)
+                try:
+                    log.debug("[%s] Try associating floating ip (%s) to server (%s)...",
+                            resource_handler.name, floating_ip.floating_ip_address, server.id)
+                    self.connopenstack.compute.add_floating_ip_to_server(server.id, floating_ip.floating_ip_address)
+                    time.sleep(random.randint(1,5))
+                    allocated_device_id = self.connopenstack.network.get_ip(floating_ip).port_details['device_id']
+                    if allocated_device_id != server.id:
+                        log.debug("SOMEONE took my ip meanwhile I was allocating it!")
+                        raise Exception
+                    else:
+                        log.debug("[%s] Associating floating ip (%s) to node: success. Took %i seconds.", resource_handler.name, floating_ip.floating_ip_address, (attempts - 1) * flip_waiting)
+                        break
+                except Exception as e:
+                    log.debug(e)
+                    log.debug("[%s] Associating floating ip (%s) to node failed. Retry after %i seconds...", resource_handler.name, floating_ip.floating_ip_address, flip_waiting)
+                    time.sleep(flip_waiting)
+                    attempts += 1
+            else:
+                unused_ips = [addr for addr in self.conn.floating_ips.list() \
+                            if addr.instance_id is None and ( not pool or pool == addr.pool) ]
+                if not unused_ips:
+                    if pool is not None:
+                        error_msg = '[{0}] Cannot find unused floating ip address in pool "{1}"!'.format(
+                            resource_handler.name, pool)
+                    else:
+                        error_msg = '[{0}] Cannot find unused floating ip address!'.format(
+                            resource_handler.name)
+                    server = self.conn.servers.get(server.id)
+                    self.conn.servers.delete(server)
+                    raise NodeCreationError(None, error_msg)
+                log.debug("[%s] List of unused floating ips: %s", resource_handler.name, str([ ip.ip for ip in unused_ips]))
+                floating_ip = random.choice(unused_ips)
+                try:
+                    log.debug("[%s] Try associating floating ip (%s) to server (%s)...",
+                            resource_handler.name, floating_ip.ip, server.id)
+                    server.add_floating_ip(floating_ip)
+                    time.sleep(random.randint(1,5))
+                    flips = self.conn.floating_ips.list()
+                    log.debug("[%s] List of floating IPs: %s", resource_handler.name, flips)
+                    myallocation = [ addr for addr in flips if addr.instance_id == server.id ]
+                    if not myallocation:
+                        log.debug("SOMEONE took my ip meanwhile I was allocating it!")
+                        raise Exception
+                    else:
+                        log.debug("ALLOCATION seemt to succeed: %r",myallocation[0])
+                        log.debug("[%s] Associating floating ip (%s) to node: success. Took %i seconds.", resource_handler.name, floating_ip.ip, (attempts - 1) * flip_waiting)
+                        break
+                except Exception as e:
+                    log.debug(e)
+                    log.debug("[%s] Associating floating ip (%s) to node failed. Retry after %i seconds...", resource_handler.name, floating_ip.ip, flip_waiting)
+                    time.sleep(flip_waiting)
+                    attempts += 1
         if attempts > flip_attempts:
             error_msg = '[{0}] Gave up associating floating ip to node! Could not get it in {1} seconds."'.format(
                         resource_handler.name, flip_attempts * flip_waiting)

@@ -17,8 +17,8 @@ import setuptools
 
 setuptools.setup(
     name='OCCO-ResourceHandler',
-    version='1.8',
-    author='MTA SZTAKI',
+    version='1.9',
+    author='SZTAKI',
     author_email='occopus@lpds.sztaki.hu',
     namespace_packages=[
         'occo',
@@ -43,6 +43,7 @@ setuptools.setup(
     description='Occopus Resource Handler',
     long_description=open('README.txt').read(),
     install_requires=[
+        'openstacksdk',
         'azure-common',
         'azure-mgmt-compute',
         'azure-mgmt-network',

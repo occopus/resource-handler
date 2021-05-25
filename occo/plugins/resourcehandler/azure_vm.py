@@ -37,12 +37,12 @@ from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
 import itertools as it
 import logging
 import occo.constants.status as status
-from occo.exceptions import SchemaError
+from occo.exceptions import SchemaError, NodeCreationError
 import base64
 
 __all__ = ['AzureResourceHandler']
 
-PROTOCOL_ID = 'azure'
+PROTOCOL_ID = 'azure_vm'
 
 STATE_MAPPING = {
     'creating'            : status.PENDING,
@@ -427,6 +427,10 @@ class AzureResourceHandler(ResourceHandler):
                  name=None, dry_run=False,
                  **config):
         self.endpoint = endpoint
+        if (not auth_data) or (not "subscription_id" in auth_data) or (not "tenant_id" in auth_data) or (not "client_id" in auth_data) or (not "client_secret" in auth_data):
+           errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
+           log.debug(errormsg)
+           raise NodeCreationError(None, errormsg)
         self.auth_data = auth_data
         self.subscription_id = auth_data['subscription_id']
         self.tenant_id = auth_data['tenant_id']

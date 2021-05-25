@@ -1,3 +1,10 @@
+v1.9 - May 2021
+- Update dependencies of nova plugins
+- Update nova client library to latest version in nova plugin
+- Refactor floating ip handling in nova plugin
+- Fix authentication checking in the azure container and vm plugins
+- Fix protocol_id in azure vm plugin
+
 v1.8 - Aug 2020
 - Add Azure ACI (container) plugin
 - Remove OCCI plugin

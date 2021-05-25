@@ -399,6 +399,11 @@ class AzureResourceHandler(ResourceHandler):
         self.dry_run = dry_run
         self.name = name if name else endpoint
 
+        if (not auth_data) or (not "subscription_id" in auth_data) or (not "tenant_id" in auth_data) or (not "client_id" in auth_data) or (not "client_secret" in auth_data):
+           errormsg = "Cannot find credentials for \""+endpoint+"\". Please, specify!"
+           log.debug(errormsg)
+           raise NodeCreationError(None, errormsg)
+
     def get_connection(self):
         return setup_connection(self.endpoint, self.auth_data)
 
