@@ -5,3 +5,5 @@ PyYAML==4.2b1
 dicttoxml==1.7.4
 OCCO-Util==0.2.0
 OCCO-InfoBroker==0.2.0
+dogpile.cache==0.6.5
+openstacksdk==0.55.0
