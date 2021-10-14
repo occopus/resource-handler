@@ -173,12 +173,12 @@ class CreateNode(Command):
     def _create_vm_parameters(self, nic_id, customdata):
         """Create the VM parameters structure.
         """
-        return {
+        server_name = self.node_def['resource'].get('server_name', unique_vmname(self.node_def))
+        d = {
             'location': self.res['location'],
             'os_profile': {
-                'computer_name': self.node_def['name'],
+                'computer_name': server_name,
                 'admin_username': self.res['username'],
-                'admin_password': self.res['password'],
                 'customData': customdata if customdata != None else ''
             },
             'hardware_profile': {
@@ -198,6 +198,19 @@ class CreateNode(Command):
                 }]
             },
         }
+        if 'password' in self.res:
+            d['os_profile']['admin_password'] = self.res['password']
+        else:
+            d['os_profile']['linux_configuration'] = {
+                'disable_password_authentication': True,
+                'ssh': {
+                    'public_keys': [{
+                        'path': '/home/{}/.ssh/authorized_keys'.format(self.res['username']),
+                        'key_data': self.res['ssh_key_data']
+                    }]
+                }
+            }
+        return d
 
     def _create_vm(self, nic, vm_name, customdata):
         vm_parameters = self._create_vm_parameters(nic.id, customdata)
@@ -465,12 +478,16 @@ class AzureResourceHandler(ResourceHandler):
 class AzureSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "resource_group", "location", "vm_size",
-                         "publisher", "offer", "sku", "version", "username", "password"]
-        self.opt_keys = ["public_ip_needed", "vnet_name", "subnet_name", "customdata"]
+                         "publisher", "offer", "sku", "version", "username"]
+        self.opt_keys = ["public_ip_needed", "vnet_name", "subnet_name", "customdata",
+                         "server_name", "password", "ssh_key_data"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
             msg = "Missing key(s): " + ', '.join(str(key) for key in missing_keys)
+            raise SchemaError(msg)
+        if "password" not in data and "ssh_key_data" not in data:
+            msg = "Missing key(s): either \"password\" or \"ssh_key_data\" must be defined"
             raise SchemaError(msg)
         valid_keys = self.req_keys + self.opt_keys
         invalid_keys = RHSchemaChecker.get_invalid_keys(self, data, valid_keys)

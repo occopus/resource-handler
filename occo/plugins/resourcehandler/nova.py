@@ -23,7 +23,7 @@ import uuid
 import random
 import novaclient
 import novaclient.client
-import openstack
+from openstack import connection
 import novaclient.auth_plugin
 from keystoneauth1.identity import v3
 from keystoneauth1 import session
@@ -60,7 +60,8 @@ def setup_connection(endpoint, auth_data, resolved_node_definition):
     project_id = resolved_node_definition['resource'].get('project_id', None)
     user_domain_name = resolved_node_definition['resource'].get('user_domain_name', 'Default')
     region_name = resolved_node_definition['resource'].get('region_name', None)
-    if auth_data.get('type', None) is None:
+    auth_type = auth_data.get('type', None)
+    if auth_type is None:
         user = auth_data['username']
         password = auth_data['password']
         if tenant_name is not None:
@@ -69,7 +70,7 @@ def setup_connection(endpoint, auth_data, resolved_node_definition):
             auth = v3.Password(auth_url=endpoint, username=user, password=password, project_id=project_id, user_domain_name=user_domain_name)
             sess = session.Session(auth=auth)
             nt = novaclient.client.Client(2, session=sess, region_name=region_name)
-    elif auth_data.get('type',None) == 'application_credential':
+    elif auth_type == 'application_credential':
         cred_id = auth_data['id']
         cred_secret = auth_data['secret']
         if tenant_name is None:
@@ -78,21 +79,14 @@ def setup_connection(endpoint, auth_data, resolved_node_definition):
                                             application_credential_id = cred_id)
             sess = session.Session(auth=auth)
             nt = novaclient.client.Client(2, session=sess, region_name=region_name)
-    elif auth_data.get('type',None) == 'voms':
+    elif auth_type == 'voms':
         novaclient.auth_plugin.discover_auth_systems()
         auth_plugin = novaclient.auth_plugin.load_plugin('voms')
         auth_plugin.opts["x509_user_proxy"] = auth_data['proxy']
         nt = novaclient.client.Client('2.0', None, None, tenant_name, endpoint, auth_plugin=auth_plugin, auth_system='voms',region_name=region_name)
-    os = openstack.connect(
-        auth_url=endpoint,
-        project_id=project_id,
-        username=auth_data['username'],
-        password=auth_data['password'],
-        region_name=region_name,
-        user_domain_name=user_domain_name,
-        project_domain_name=user_domain_name,
-        app_name='',
-        app_version='') if region_name != None else None
+    os = connection.Connection(
+        session=sess,
+        region_name=region_name) if region_name != None else None
     return (nt, os)
 
 def needs_connection(f):
@@ -154,6 +148,7 @@ class CreateNode(Command):
         key_name = node_def['resource'].get('key_name', None)
         server_name = node_def['resource'].get('server_name',unique_vmname(node_def))
         network_id = node_def['resource'].get('network_id', None)
+        boot_volume = node_def['resource'].get('boot_from_volume', False)
         nics = None
         if network_id is not None:
             nics = [{"net-id": network_id, "v4-fixed-ip": ''}]
@@ -164,8 +159,13 @@ class CreateNode(Command):
             KBinterrupt = False
             with GracefulInterruptHandler() as h:
                 log.debug('Server creation started for node %s...', node_def['node_id'])
-                server = self.conn.servers.create(server_name, image_id, flavor_name,
-                     security_groups=sec_groups, key_name=key_name, userdata=context, nics=nics)
+                if self.connopenstack is None:
+                    server = self.conn.servers.create(server_name, image_id, flavor_name,
+                        security_groups=sec_groups, key_name=key_name, userdata=context, nics=nics)
+                else:
+                    server = self.connopenstack.create_server(server_name, image=image_id,
+                        flavor=flavor_name, boot_from_volume=boot_volume, terminate_volume=True, security_groups=sec_groups,
+                        key_name=key_name, userdata=context, nics=nics)
                 KBinterrupt = h.interrupted
                 log.debug('Server creation finished for node %s: server: %r', node_def['node_id'], server)
             if KBinterrupt:
@@ -475,7 +475,7 @@ class NovaResourceHandler(ResourceHandler):
 class NovaSchemaChecker(RHSchemaChecker):
     def __init__(self):
         self.req_keys = ["type", "endpoint", "image_id", "flavor_name"]
-        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip", "name", "project_id", "tenant_name", "user_domain_name", "network_id", "floating_ip_pool", "region_name"]
+        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip", "name", "project_id", "tenant_name", "user_domain_name", "network_id", "floating_ip_pool", "region_name", "boot_from_volume"]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
