@@ -47,6 +47,8 @@ STATE_MAPPING = {
 
 log = logging.getLogger('occo.resourcehandler.nova')
 
+ALLOWED_AUTH_TYPES = [None, 'application_credential']
+
 def setup_connection(endpoint, auth_data, resolved_node_definition):
     """
     Setup the connection to the Nova endpoint.
@@ -377,14 +379,10 @@ class NovaResourceHandler(ResourceHandler):
             self.endpoint = endpoint
         self.name = name if name else endpoint
         if (not auth_data) or \
-           ((not "type" in auth_data) and \
-             ((not "username" in auth_data) or (not "password" in auth_data))) or \
-           (("type" in auth_data) and \
-             ((not "application_credential" in auth_data['type']) and \
-              (not "voms" in auth_data['type']))) or \
+           (("type" not in auth_data) and (("username" not in auth_data) or ("password" not in auth_data))) or \
+           (("type" in auth_data) and (auth_data['type'] not in ALLOWED_AUTH_TYPES) or \
            (("type" in auth_data) and ("application_credential" in auth_data['type']) and \
-             ((not "id" in auth_data) or (not "secret" in auth_data))) or \
-           (("type" in auth_data) and ("voms" in auth_data['type']) and (not "proxy" in auth_data)):
+             (("id" not in auth_data) or ("secret" not in auth_data)))):
             errormsg = "Cannot find credentials for \""+endpoint+"\". Found only: \""+str(auth_data)+"\". Please, specify!"
             raise NodeCreationError(None,errormsg)
         self.auth_data = auth_data
