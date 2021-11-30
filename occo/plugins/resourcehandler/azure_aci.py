@@ -112,10 +112,12 @@ class CreateNode(Command):
     @wet_method('1')
     def _start_container(self, resource_handler):
         log.debug('Starting Azure ACI')
-        location = self.res['location']
+        location = self.res['location'].lower()
         self.resource_client.resource_groups.create_or_update(
             self.res['resource_group'], {'location': self.res['location']})
         container_group_name = unique_vmname(self.node_def)
+        network_type = self.res['network_type']
+        network_profile = None
         if 'gpu_type' in self.res:
             count = self.res['gpu_count'] if 'gpu_count' in self.res else 1
             gpu = GpuResource(count=count, sku=self.res['gpu_type'])
@@ -134,6 +136,9 @@ class CreateNode(Command):
             ports.append(ContainerPort(port=port, protocol=protocol))
             ipports.append(Port(protocol=protocol, port=port))
         environment = []
+        if network_type.lower() == 'public':
+            pubip_var = EnvironmentVariable(name='_OCCOPUS_ALLOCATED_FQDN', value='%s.%s.azurecontainer.io' % (container_group_name, location))
+            environment.append(pubip_var)
         for env in self.env:
             edata = env.split('=', 1)
             if len(edata) != 2: continue
@@ -145,8 +150,6 @@ class CreateNode(Command):
                           ports=ports,
                           command=self.command if self.command is not None else None,
                           environment_variables=environment)
-        network_type = self.res['network_type']
-        network_profile = None
         if network_type.lower() == 'public':
             group_ip_address = IpAddress(ports=ipports,
                                         dns_name_label=container_group_name,

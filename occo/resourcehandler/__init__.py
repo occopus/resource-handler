@@ -93,6 +93,9 @@ class ResourceHandler(factory.MultiBackend):
     def cri_get_address(self, instance_data):
         raise NotImplementedError()
 
+    def cri_get_cost(self, instance_data):
+        raise NotImplementedError()
+
     def cri_get_ip_address(self, instance_data):
         raise NotImplementedError()
 
@@ -120,6 +123,10 @@ class ResourceHandler(factory.MultiBackend):
         rh = self.instantiate_rh(instance_data)
         return rh.cri_get_address(instance_data).perform(rh)
 
+    def get_cost(self, instance_data):
+        rh = self.instantiate_rh(instance_data)
+        return rh.cri_get_cost(instance_data).perform(rh)
+
     def get_ip_address(self, instance_data):
         rh = self.instantiate_rh(instance_data)
         return rh.cri_get_ip_address(instance_data).perform(rh)
@@ -142,3 +149,6 @@ class ResourceHandlerProvider(ib.InfoProvider):
     def get_address(self, instance_data):
         return self.resource_handler.get_address(instance_data)
 
+    @ib.provides('node.resource.cost')
+    def get_cost(self, instance_data):
+        return self.resource_handler.get_cost(instance_data)

@@ -79,6 +79,13 @@ def getTagText(nodelist):
             rc.append(node.data)
     return ''.join(rc)
 
+def getTagNumber(nodelist):
+    rc = []
+    for node in nodelist:
+        if node.nodeType == node.TEXT_NODE:
+            rc.append(node.data)
+    return float(''.join(rc))
+
 class CreateNode(Command):
     def __init__(self, resolved_node_definition):
         Command.__init__(self)
@@ -226,6 +233,24 @@ class GetAddress(Command):
         retaddr = list(OrderedDict.fromkeys(addresses))
         return retaddr
 
+class GetCost(Command):
+    def __init__(self, instance_data):
+        Command.__init__(self)
+        self.instance_data = instance_data
+
+    @wet_method(0)
+    def perform(self, resource_handler):
+        try:
+            query_str = resource_handler.endpoint + '/instances/' + self.instance_data['instance_id'] + '/costs.xml'
+            r = requests.get(query_str, auth=get_auth(resource_handler.auth_data))
+            costTree = xml.dom.minidom.parseString(r.text)
+            fees = costTree.documentElement.getElementsByTagName('fee')
+            totalfee = filter(lambda x: x.getElementsByTagName('name')[0].childNodes[0].data == 'Total', fees)
+            totalcost = abs(float(list(totalfee)[0].getElementsByTagName('total_cost')[0].childNodes[0].data))
+            return totalcost
+        except Exception as e:
+            return 0
+
 @factory.register(ResourceHandler, PROTOCOL_ID)
 class CloudBrokerResourceHandler(ResourceHandler):
     """ Implementation of the
@@ -268,6 +293,9 @@ class CloudBrokerResourceHandler(ResourceHandler):
 
     def cri_get_address(self, instance_data):
         return GetAddress(instance_data)
+
+    def cri_get_cost(self, instance_data):
+        return GetCost(instance_data)
 
     def cri_get_ip_address(self, instance_data):
         return GetIpAddress(instance_data)

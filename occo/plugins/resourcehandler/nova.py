@@ -18,23 +18,18 @@
 .. moduleauthor:: Zoltan Farkas <zoltan.farkas@sztaki.mta.hu>
 """
 
-import time
-import uuid
-import random
-import novaclient
-import novaclient.client
-import openstack
-import novaclient.auth_plugin
-from keystoneauth1.identity import v3
-from keystoneauth1 import session
-from urllib.parse import urlparse
-import occo.util.factory as factory
-from occo.util import wet_method, coalesce, unique_vmname
-from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
-import itertools as it
 import logging
 import occo.constants.status as status
+import occo.util.factory as factory
+import re
+import time
+
 from occo.exceptions import SchemaError, NodeCreationError
+from occo.resourcehandler import ResourceHandler, Command, RHSchemaChecker
+from occo.util import wet_method, unique_vmname
+from openstack import connection
+from keystoneauth1.identity import v3
+from keystoneauth1 import session
 
 __all__ = ['NovaResourceHandler']
 
@@ -52,48 +47,32 @@ STATE_MAPPING = {
 
 log = logging.getLogger('occo.resourcehandler.nova')
 
+ALLOWED_AUTH_TYPES = [None, 'application_credential']
+
 def setup_connection(endpoint, auth_data, resolved_node_definition):
     """
     Setup the connection to the Nova endpoint.
     """
-    tenant_name = resolved_node_definition['resource'].get('tenant_name', None)
     project_id = resolved_node_definition['resource'].get('project_id', None)
     user_domain_name = resolved_node_definition['resource'].get('user_domain_name', 'Default')
     region_name = resolved_node_definition['resource'].get('region_name', None)
-    if auth_data.get('type', None) is None:
+    auth_type = auth_data.get('type', None)
+    if auth_type is None:
         user = auth_data['username']
         password = auth_data['password']
-        if tenant_name is not None:
-            nt = novaclient.client.Client('2.0', user, password, tenant_name, endpoint, region_name=region_name)
-        else:
-            auth = v3.Password(auth_url=endpoint, username=user, password=password, project_id=project_id, user_domain_name=user_domain_name)
-            sess = session.Session(auth=auth)
-            nt = novaclient.client.Client(2, session=sess, region_name=region_name)
-    elif auth_data.get('type',None) == 'application_credential':
+        auth = v3.Password(auth_url=endpoint, username=user, password=password, project_id=project_id, user_domain_name=user_domain_name)
+        sess = session.Session(auth=auth)
+    elif auth_type == 'application_credential':
         cred_id = auth_data['id']
         cred_secret = auth_data['secret']
-        if tenant_name is None:
-            auth = v3.ApplicationCredential(auth_url = endpoint,
-                                            application_credential_secret = cred_secret,
-                                            application_credential_id = cred_id)
-            sess = session.Session(auth=auth)
-            nt = novaclient.client.Client(2, session=sess, region_name=region_name)
-    elif auth_data.get('type',None) == 'voms':
-        novaclient.auth_plugin.discover_auth_systems()
-        auth_plugin = novaclient.auth_plugin.load_plugin('voms')
-        auth_plugin.opts["x509_user_proxy"] = auth_data['proxy']
-        nt = novaclient.client.Client('2.0', None, None, tenant_name, endpoint, auth_plugin=auth_plugin, auth_system='voms',region_name=region_name)
-    os = openstack.connect(
-        auth_url=endpoint,
-        project_id=project_id,
-        username=auth_data['username'],
-        password=auth_data['password'],
-        region_name=region_name,
-        user_domain_name=user_domain_name,
-        project_domain_name=user_domain_name,
-        app_name='',
-        app_version='') if region_name != None else None
-    return (nt, os)
+        auth = v3.ApplicationCredential(auth_url = endpoint,
+                                        application_credential_secret = cred_secret,
+                                        application_credential_id = cred_id)
+        sess = session.Session(auth=auth)
+    else:
+        raise NodeCreationError(None, 'Unknown authentication type provided: "%s"' % auth_type)
+    os = connection.Connection(session=sess, region_name=region_name)
+    return os
 
 def needs_connection(f):
     """
@@ -105,9 +84,7 @@ def needs_connection(f):
     import functools
     @functools.wraps(f)
     def g(self, resource_handler, *args, **kwargs):
-        (a, b) = resource_handler.get_connection(self.resolved_node_definition)
-        self.conn = a
-        self.connopenstack = b
+        self.connopenstack = resource_handler.get_connection(self.resolved_node_definition)
         return f(self, resource_handler, *args, **kwargs)
 
     return g
@@ -154,6 +131,9 @@ class CreateNode(Command):
         key_name = node_def['resource'].get('key_name', None)
         server_name = node_def['resource'].get('server_name',unique_vmname(node_def))
         network_id = node_def['resource'].get('network_id', None)
+        volume_size = node_def['resource'].get('volume_size', None)
+        volume_persist = node_def['resource'].get('volume_persist', False)
+        terminate_volume = (not volume_persist)
         nics = None
         if network_id is not None:
             nics = [{"net-id": network_id, "v4-fixed-ip": ''}]
@@ -164,8 +144,19 @@ class CreateNode(Command):
             KBinterrupt = False
             with GracefulInterruptHandler() as h:
                 log.debug('Server creation started for node %s...', node_def['node_id'])
-                server = self.conn.servers.create(server_name, image_id, flavor_name,
-                     security_groups=sec_groups, key_name=key_name, userdata=context, nics=nics)
+                if volume_size is None:
+                    server = self.connopenstack.create_server(server_name, image=image_id,
+                        flavor=flavor_name, terminate_volume=terminate_volume, security_groups=sec_groups,
+                        key_name=key_name, userdata=context, nics=nics)
+                elif volume_size == 0:
+                    server = self.connopenstack.create_server(server_name, image=image_id,
+                        flavor=flavor_name, boot_from_volume=True, terminate_volume=terminate_volume, security_groups=sec_groups,
+                        key_name=key_name, userdata=context, nics=nics)
+                else:
+                    volume = self.connopenstack.create_volume(volume_size, image=image_id, bootable=True)
+                    server = self.connopenstack.create_server(server_name, image=image_id,
+                        flavor=flavor_name, boot_volume=volume.id, terminate_volume=terminate_volume,
+                        security_groups=sec_groups, key_name=key_name, userdata=context, nics=nics)
                 KBinterrupt = h.interrupted
                 log.debug('Server creation finished for node %s: server: %r', node_def['node_id'], server)
             if KBinterrupt:
@@ -176,7 +167,7 @@ class CreateNode(Command):
             if server is not None:
                 log.debug('Rolling back...')
                 try:
-                    self.conn.servers.delete(server)
+                    self.connopenstack.delete_server(server.id)
                 except Exception as ex:
                     raise NodeCreationError(None, str(ex))
             raise
@@ -192,74 +183,31 @@ class CreateNode(Command):
         flip_attempts = 60
         attempts = 1
         while attempts <= flip_attempts:
-            if self.connopenstack != None:
-                floating_ip = self.connopenstack.network.find_available_ip()
-                if not floating_ip:
-                    floating_ip = self.connopenstack.network.create_ip(floating_network_id=pool)
-                if not floating_ip:
-                    error_msg = '[{0}] No usable floating ip address found!'.format(
+            floating_ip = self.connopenstack.available_floating_ip(network=pool)
+            if not floating_ip:
+                if pool is not None:
+                    error_msg = '[{0}] Cannot find unused floating ip address in pool "{1}"!'.format(
+                        resource_handler.name, pool)
+                else:
+                    error_msg = '[{0}] Cannot find unused floating ip address!'.format(
                         resource_handler.name)
-                    server = self.conn.servers.get(server.id)
-                    self.conn.servers.delete(server)
-                    raise NodeCreationError(None, error_msg)
-                try:
-                    log.debug("[%s] Try associating floating ip (%s) to server (%s)...",
-                            resource_handler.name, floating_ip.floating_ip_address, server.id)
-                    self.connopenstack.compute.add_floating_ip_to_server(server.id, floating_ip.floating_ip_address)
-                    time.sleep(random.randint(1,5))
-                    allocated_device_id = self.connopenstack.network.get_ip(floating_ip).port_details['device_id']
-                    if allocated_device_id != server.id:
-                        log.debug("SOMEONE took my ip meanwhile I was allocating it!")
-                        raise Exception
-                    else:
-                        log.debug("[%s] Associating floating ip (%s) to node: success. Took %i seconds.", resource_handler.name, floating_ip.floating_ip_address, (attempts - 1) * flip_waiting)
-                        break
-                except Exception as e:
-                    log.debug(e)
-                    log.debug("[%s] Associating floating ip (%s) to node failed. Retry after %i seconds...", resource_handler.name, floating_ip.floating_ip_address, flip_waiting)
-                    time.sleep(flip_waiting)
-                    attempts += 1
-            else:
-                unused_ips = [addr for addr in self.conn.floating_ips.list() \
-                            if addr.instance_id is None and ( not pool or pool == addr.pool) ]
-                if not unused_ips:
-                    if pool is not None:
-                        error_msg = '[{0}] Cannot find unused floating ip address in pool "{1}"!'.format(
-                            resource_handler.name, pool)
-                    else:
-                        error_msg = '[{0}] Cannot find unused floating ip address!'.format(
-                            resource_handler.name)
-                    server = self.conn.servers.get(server.id)
-                    self.conn.servers.delete(server)
-                    raise NodeCreationError(None, error_msg)
-                log.debug("[%s] List of unused floating ips: %s", resource_handler.name, str([ ip.ip for ip in unused_ips]))
-                floating_ip = random.choice(unused_ips)
-                try:
-                    log.debug("[%s] Try associating floating ip (%s) to server (%s)...",
-                            resource_handler.name, floating_ip.ip, server.id)
-                    server.add_floating_ip(floating_ip)
-                    time.sleep(random.randint(1,5))
-                    flips = self.conn.floating_ips.list()
-                    log.debug("[%s] List of floating IPs: %s", resource_handler.name, flips)
-                    myallocation = [ addr for addr in flips if addr.instance_id == server.id ]
-                    if not myallocation:
-                        log.debug("SOMEONE took my ip meanwhile I was allocating it!")
-                        raise Exception
-                    else:
-                        log.debug("ALLOCATION seemt to succeed: %r",myallocation[0])
-                        log.debug("[%s] Associating floating ip (%s) to node: success. Took %i seconds.", resource_handler.name, floating_ip.ip, (attempts - 1) * flip_waiting)
-                        break
-                except Exception as e:
-                    log.debug(e)
-                    log.debug("[%s] Associating floating ip (%s) to node failed. Retry after %i seconds...", resource_handler.name, floating_ip.ip, flip_waiting)
-                    time.sleep(flip_waiting)
-                    attempts += 1
+                self.connopenstack.delete_server(server.id)
+                raise NodeCreationError(None, error_msg)
+            try:
+                log.debug("[%s] Try associating floating ip (%s) to server (%s)...",
+                        resource_handler.name, floating_ip.floating_ip_address, server.id)
+                self.connopenstack.compute.add_floating_ip_to_server(server.id, floating_ip.floating_ip_address)
+                break
+            except Exception as e:
+                log.debug(e)
+                log.debug("[%s] Associating floating ip (%s) to node failed. Retry after %i seconds...", resource_handler.name, floating_ip.floating_ip_address, flip_waiting)
+                time.sleep(flip_waiting)
+                attempts += 1
         if attempts > flip_attempts:
             error_msg = '[{0}] Gave up associating floating ip to node! Could not get it in {1} seconds."'.format(
                         resource_handler.name, flip_attempts * flip_waiting)
             log.error(error_msg)
-            server = self.conn.servers.get(server.id)
-            self.conn.servers.delete(server)
+            self.connopenstack.delete_server(server.id)
             raise NodeCreationError(None, error_msg)
         return
 
@@ -277,7 +225,7 @@ class CreateNode(Command):
             try:
                 if server is not None:
                     log.debug('Interrupting node creation! Rolling back. Please, stand by!')
-                    self.conn.servers.delete(server)
+                    self.connopenstack.delete_server(server.id)
             except Exception as ex:
                 raise NodeCreationError(None, str(ex))
             raise
@@ -290,20 +238,19 @@ class DropNode(Command):
         self.resolved_node_definition = instance_data['resolved_node_definition']
 
     @wet_method()
-    @needs_connection
-    def _delete_vms(self, resource_handler, *vm_ids):
+    def _delete_vms(self, vm_id):
         """
-        Terminate VM instances.
+        Terminate VM instance.
 
-        :param vm_ids: The list of VM instance identifiers.
-        :type vm_ids: str
+        :param vm_id: The VM instance ID to terminate.
+        :type vm_id: str
 
         :Remark: This is a "wet method", termination will not be attempted
             if the instance is in debug mode (``dry_run``).
         """
-        server = self.conn.servers.get(vm_ids)
-        self.conn.servers.delete(server)
+        self.connopenstack.delete_server(vm_id)
 
+    @needs_connection
     def perform(self, resource_handler):
         """
         Terminate a VM instance.
@@ -317,7 +264,7 @@ class DropNode(Command):
         log.debug("[%s] Dropping node %r", resource_handler.name,
                   self.instance_data['node_id'])
         try:
-            self._delete_vms(resource_handler, instance_id)
+            self._delete_vms(instance_id)
         except Exception as ex:
             raise NodeCreationError(None, str(ex))
 
@@ -335,7 +282,7 @@ class GetState(Command):
         log.debug("[%s] Acquiring node state %r",
                   resource_handler.name, self.instance_data['node_id'])
         try:
-            server = self.conn.servers.get(self.instance_data['instance_id'])
+            server = self.connopenstack.get_server(self.instance_data['instance_id'])
         except Exception as ex:
             raise NodeCreationError(None, str(ex))
         inst_state = server.status
@@ -361,17 +308,17 @@ class GetAnyIpAddress(Command):
                   resource_handler.name,
                   self.instance_data['node_id'])
         try:
-            server = self.conn.servers.get(self.instance_data['instance_id'])
+            server = self.connopenstack.get_server(self.instance_data['instance_id'])
         except Exception as ex:
             raise NodeCreationError(None, str(ex))
-        floating_ips = self.conn.floating_ips.list()
-        for floating_ip in floating_ips:
-            if floating_ip.instance_id == server.id:
-                return floating_ip.ip
-        networks = self.conn.servers.ips(server)
-        for tenant in list(networks.keys()):
-            for addre in networks[tenant]:
-                return addre['addr']
+        addresses = server.addresses
+        for network in addresses:
+            for address in addresses[network]:
+                if address['OS-EXT-IPS:type'] == 'floating':
+                    return address['addr']
+        for network in addresses:
+            for address in addresses[network]:
+                return address['addr']
         return None
 
 class GetPrivIpAddress(Command):
@@ -387,25 +334,15 @@ class GetPrivIpAddress(Command):
                   resource_handler.name,
                   self.instance_data['node_id'])
         try:
-            server = self.conn.servers.get(self.instance_data['instance_id'])
+            server = self.connopenstack.get_server(self.instance_data['instance_id'])
         except Exception as ex:
             raise NodeCreationError(None, str(ex))
-        ip = ""
-        floating_ips = self.conn.floating_ips.list()
-        networks = self.conn.servers.ips(server)
-        for tenant in list(networks.keys()):
-            log.debug("[%s] networks[tenant]: %s",resource_handler.name,networks[tenant])
-            for addre in networks[tenant]:
-                ip = addre['addr']
-                private_ip = ip
-                for floating_ip in floating_ips:
-                    if floating_ip.instance_id == server.id:
-                        if floating_ip.ip == ip:
-                            private_ip = ""
-                if private_ip != "":
-                  log.debug("[%s] Private ip found: %s",resource_handler.name,private_ip)
-                  return private_ip
-        log.debug("[%s] Private ip not found.",resource_handler.name)
+        addresses = server.addresses
+        for network in addresses:
+            for address in addresses[network]:
+                if address['OS-EXT-IPS:type'] == 'fixed':
+                    return address['addr']
+        log.debug("[%s] Private ip not found.", resource_handler.name)
         return None
 
 @factory.register(ResourceHandler, PROTOCOL_ID)
@@ -434,17 +371,18 @@ class NovaResourceHandler(ResourceHandler):
                  name=None, dry_run=False,
                  **config):
         self.dry_run = dry_run
+        # Check if endpoint includes API version (/v3, /v3/, etc.)
+        if re.compile('\/v\d+[\/]*$').search(endpoint) is None:
+            # If no API version is included, assume v3
+            self.endpoint = ('%s/v3' % endpoint) if not endpoint.endswith('/') else ('%sv3' % endpoint)
+        else:
+            self.endpoint = endpoint
         self.name = name if name else endpoint
-        self.endpoint = endpoint
         if (not auth_data) or \
-           ((not "type" in auth_data) and \
-             ((not "username" in auth_data) or (not "password" in auth_data))) or \
-           (("type" in auth_data) and \
-             ((not "application_credential" in auth_data['type']) and \
-              (not "voms" in auth_data['type']))) or \
+           (("type" not in auth_data) and (("username" not in auth_data) or ("password" not in auth_data))) or \
+           (("type" in auth_data) and (auth_data['type'] not in ALLOWED_AUTH_TYPES) or \
            (("type" in auth_data) and ("application_credential" in auth_data['type']) and \
-             ((not "id" in auth_data) or (not "secret" in auth_data))) or \
-           (("type" in auth_data) and ("voms" in auth_data['type']) and (not "proxy" in auth_data)):
+             (("id" not in auth_data) or ("secret" not in auth_data)))):
             errormsg = "Cannot find credentials for \""+endpoint+"\". Found only: \""+str(auth_data)+"\". Please, specify!"
             raise NodeCreationError(None,errormsg)
         self.auth_data = auth_data
@@ -474,8 +412,11 @@ class NovaResourceHandler(ResourceHandler):
 @factory.register(RHSchemaChecker, PROTOCOL_ID)
 class NovaSchemaChecker(RHSchemaChecker):
     def __init__(self):
-        self.req_keys = ["type", "endpoint", "image_id", "flavor_name"]
-        self.opt_keys = ["server_name", "key_name", "security_groups", "floating_ip", "name", "project_id", "tenant_name", "user_domain_name", "network_id", "floating_ip_pool", "region_name"]
+        self.req_keys = ["type", "endpoint", "image_id", "flavor_name", "project_id"]
+        self.opt_keys = [
+            "server_name", "key_name", "security_groups", "floating_ip", "name", "tenant_name",
+            "user_domain_name", "network_id", "floating_ip_pool", "region_name", "volume_size", "volume_persist"
+        ]
     def perform_check(self, data):
         missing_keys = RHSchemaChecker.get_missing_keys(self, data, self.req_keys)
         if missing_keys:
@@ -486,4 +427,13 @@ class NovaSchemaChecker(RHSchemaChecker):
         if invalid_keys:
             msg = "Unknown key(s): " + ', '.join(str(key) for key in invalid_keys)
             raise SchemaError(msg)
+        volume_size = data.get('volume_size', None)
+        if volume_size is not None:
+            try:
+                volume_size = int(volume_size)
+            except Exception as ex:
+                msg = 'Could not convert volume_size value "%s" to integer!' % volume_size
+                raise SchemaError(msg)
+            if volume_size < 0:
+                raise SchemaError('Negative numbers for volume_size are prohibited!')
         return True
